@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Play, Pause, Folder, SkipForward, SkipBack, Volume2, VolumeX, X, Shuffle, ChevronUp, ChevronDown } from "lucide-react";
+import { Play, Pause, Folder, SkipForward, SkipBack, Volume2, VolumeX, X, Shuffle, ChevronUp, ChevronDown, List} from "lucide-react";
 import Split from 'react-split';
 import Tracklist from './Tracklist';
 import Download from './Download';
@@ -33,6 +33,14 @@ export default function MediaPlayer() {
   const [isDragging, setIsDragging] = useState(false);
   const [tempProgress, setTempProgress] = useState(0);
   const [splitSizes, setSplitSizes] = useState([50, 50]);
+  const [playHistory, setPlayHistory] = useState<Track[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [userQueue, setUserQueue] = useState<Track[]>([]);
+  const [shuffleQueue, setShuffleQueue] = useState<Track[]>([]);
+  const [isQueueModalOpen, setIsQueueModalOpen] = useState(false);
+  const [showJumpToCurrentButton, setShowJumpToCurrentButton] = useState(false);
+  const currentTrackRef = useRef<HTMLDivElement>(null);
+  const tracklistRef = useRef<HTMLDivElement>(null);
 
   const getFileName = (filePath: string) => {
     const fileNameWithExt = filePath.split(/[\\/]/).pop() || filePath;
@@ -107,7 +115,7 @@ export default function MediaPlayer() {
     if (currentTrack) {
       (async () => {
         const safeUrl = await window.electron.getFileUrl(currentTrack.fullPath);
-        if (audio.src !== safeUrl) {  // Only set src if its different
+        if (audio.src !== safeUrl) {
           audio.src = safeUrl;
           if (isPlaying) audio.play();
         }
@@ -120,10 +128,11 @@ export default function MediaPlayer() {
       document.documentElement.style.setProperty('--progress-percent', progressPercent.toString());
     };
     const updateDuration = () => setDuration(audio.duration || 1);
+    const handleTrackEnd = () => playNext();  // use playNext instead of directly setting currentTrack
 
     audio.addEventListener("timeupdate", updateProgress);
     audio.addEventListener("loadedmetadata", updateDuration);
-    audio.addEventListener("ended", () => setCurrentTrack(getNextTrack()));
+    audio.addEventListener("ended", handleTrackEnd);
 
     // volume bar fill
     document.documentElement.style.setProperty('--volume-percent', `${volume * 100}%`);
@@ -131,13 +140,13 @@ export default function MediaPlayer() {
     return () => {
       audio.removeEventListener("timeupdate", updateProgress);
       audio.removeEventListener("loadedmetadata", updateDuration);
-      audio.removeEventListener("ended", () => setCurrentTrack(getNextTrack()));
+      audio.removeEventListener("ended", handleTrackEnd);
     };
   }, [currentTrack]); // dont depend on isplaying
 
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
-      // ignore if typing in an input element
+      // Ignore if typing in an input element
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
         return;
       }
@@ -174,6 +183,21 @@ export default function MediaPlayer() {
   };
 
   const getNextTrack = () => {
+    // check user queue (priority)
+    if (userQueue.length > 0) {
+      const nextTrack = userQueue[0];
+      setUserQueue(prev => prev.slice(1));
+      return nextTrack;
+    }
+    
+    // Then check shuffle queue
+    if (shuffleQueue.length > 0) {
+      const nextTrack = shuffleQueue[0];
+      setShuffleQueue(prev => prev.slice(1));
+      return nextTrack;
+    }
+    
+    // If both queues are empty, get next track from playlist
     if (!playlist.length) return null;
     const currentIndex = playlist.findIndex(track => track.fullPath === currentTrack?.fullPath);
     return playlist[(currentIndex + 1) % playlist.length];
@@ -185,32 +209,80 @@ export default function MediaPlayer() {
     return playlist[(currentIndex - 1 + playlist.length) % playlist.length];
   };
 
-  const getRandomTrack = () => {
-    if (!playlist.length) return null;
-    const currentIndex = playlist.findIndex(track => track.fullPath === currentTrack?.fullPath);
-    let randomIndex;
-    do {
-      randomIndex = Math.floor(Math.random() * playlist.length);
-    } while (randomIndex === currentIndex && playlist.length > 1);
-    return playlist[randomIndex];
+  // const getRandomTrack = () => {
+  //   if (!playlist.length) return null;
+  //   const currentIndex = playlist.findIndex(track => track.fullPath === currentTrack?.fullPath);
+  //   let randomIndex;
+  //   do {
+  //     randomIndex = Math.floor(Math.random() * playlist.length);
+  //   } while (randomIndex === currentIndex && playlist.length > 1);
+  //   return playlist[randomIndex];
+  // };
+
+  const updateCurrentTrackWithHistory = (track: Track | null) => {
+    if (track) {
+      setCurrentTrack(track);
+      if (historyIndex === playHistory.length - 1) {
+        // keep only the last 10 tracks in history
+        setPlayHistory(prev => {
+          const newHistory = [...prev, track];
+          return newHistory.slice(-10);
+        });
+        setHistoryIndex(prev => Math.min(prev + 1, 9));
+      } else {
+        // If we're in the middle of history, truncate forward history
+        setPlayHistory(prev => {
+          const historySoFar = prev.slice(0, historyIndex + 1);
+          const newHistory = [...historySoFar, track];
+          return newHistory.slice(-10);
+        });
+        setHistoryIndex(prev => Math.min(prev + 1, 9));
+      }
+    }
   };
 
   const playNext = () => {
     if (isShuffleOn) {
-      setCurrentTrack(getRandomTrack());
+      const nextTrack = getNextTrack();
+      updateCurrentTrackWithHistory(nextTrack);
+      
+      // Ensure shuffle queue stays populated
+      if (shuffleQueue.length < 2 && userQueue.length === 0) {
+        const remainingTracks = playlist
+          .filter(track => 
+            track.fullPath !== nextTrack?.fullPath && 
+            !userQueue.some(t => t.fullPath === track.fullPath)
+          )
+          .sort(() => Math.random() - 0.5);
+        setShuffleQueue(prev => [...prev, ...remainingTracks]);
+      }
     } else {
-      setCurrentTrack(getNextTrack());
+      updateCurrentTrackWithHistory(getNextTrack());
     }
   };
 
-  const playPrevious = () => setCurrentTrack(getPrevTrack());
+  const playPrevious = () => {
+    if (isShuffleOn && playHistory.length > 0) {
+      if (historyIndex > 0) {
+        // Go back in history
+        setHistoryIndex(prev => prev - 1);
+        setCurrentTrack(playHistory[historyIndex - 1]);
+      } else {
+        // If at the start of history, stay on current track
+        setCurrentTrack(playHistory[0]);
+      }
+    } else {
+      // Normal previous behavior when shuffle is off
+      setCurrentTrack(getPrevTrack());
+    }
+  };
 
   const handleVolumeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newVolume = parseFloat(event.target.value);
     setVolume(newVolume);
     if (audioRef.current) {
       audioRef.current.volume = newVolume;
-      // volume bar update
+      // Update volume bar fill
       document.documentElement.style.setProperty('--volume-percent', `${newVolume * 100}%`);
     }
   };
@@ -232,12 +304,38 @@ export default function MediaPlayer() {
     setIsMuted(!isMuted);
   };
 
+  const toggleShuffle = () => {
+    setIsShuffleOn(!isShuffleOn);
+    
+    if (!isShuffleOn && currentTrack) {
+      // When turning shuffle on, shuffle remaining playlist into shuffleQueue
+      const currentIndex = playlist.findIndex(track => track.fullPath === currentTrack.fullPath);
+      const remainingTracks = playlist.slice(currentIndex + 1);
+      const shuffledTracks = [...remainingTracks]
+        .sort(() => Math.random() - 0.5)
+        .filter(track => track.fullPath !== currentTrack.fullPath);
+      
+      setShuffleQueue(shuffledTracks);
+      setPlayHistory([currentTrack]);
+      setHistoryIndex(0);
+    } else {
+      // When turning shuffle off, clear shuffle queue and restore sequential order
+      setShuffleQueue([]);
+      const currentIndex = playlist.findIndex(track => track.fullPath === currentTrack?.fullPath);
+      if (currentIndex !== -1) {
+        const remainingTracks = playlist.slice(currentIndex + 1);
+        // Keep user queue intact, only clear shuffle queue
+      }
+    }
+  };
+
   const refreshPlaylist = async () => {
     if (folderPath) {
       try {
+        // Get all music files from the current folder
         const files = await window.electron.getFilesInFolder(folderPath);
         
-        // update after file load
+        // Process files and update playlist
         const formattedFiles = await Promise.all(files.map(async (file: string) => {
           const metadata = await window.electron.getMetadata(file);
           return {
@@ -269,7 +367,7 @@ export default function MediaPlayer() {
       const totalWidth = window.innerWidth;
       const minPaneWidth = 266; // Our minimum pane width
       
-      // adjust split if it's less than min width for current split
+      // If current split would make any pane too small, adjust the split
       if (totalWidth * (splitSizes[0] / 100) < minPaneWidth || 
           totalWidth * (splitSizes[1] / 100) < minPaneWidth) {
         const newSize = (minPaneWidth / totalWidth) * 100;
@@ -280,6 +378,136 @@ export default function MediaPlayer() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [splitSizes]);
+
+  const handleTrackSelect = (track: Track) => {
+    if (isShuffleOn) {
+      updateCurrentTrackWithHistory(track);
+    } else {
+      setCurrentTrack(track);
+    }
+    setIsPlaying(true);
+  };
+
+  const removeFromQueue = (indexToRemove: number) => {
+    if (indexToRemove < userQueue.length) {
+      // Remove from user queue
+      setUserQueue(prev => prev.filter((_, index) => index !== indexToRemove));
+    } else {
+      // Remove from shuffle queue
+      const shuffleIndex = indexToRemove - userQueue.length;
+      setShuffleQueue(prev => prev.filter((_, index) => index !== shuffleIndex));
+    }
+  };
+
+  const addToQueue = (track: Track) => {
+    setUserQueue(prev => [...prev, track]);
+  };
+
+  const QueueModal = ({ 
+    userQueue,
+    shuffleQueue, 
+    onClose, 
+    currentTrack 
+  }: { 
+    userQueue: Track[],
+    shuffleQueue: Track[], 
+    onClose: () => void,
+    currentTrack: Track | null 
+  }) => (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content queue-modal" onClick={e => e.stopPropagation()}>
+        <div className="queue-modal-header">
+          <h2>Play Queue</h2>
+          <button className="modal-close" onClick={onClose}>
+            <X size={24} />
+          </button>
+        </div>
+        <div className="queue-list">
+          {userQueue.length > 0 && (
+            <div className="queue-section">
+              <div className="queue-section-header">User Queue</div>
+              {userQueue.map((track, index) => (
+                <div 
+                  key={`user-${track.fullPath}-${index}`}
+                  className={`queue-item ${currentTrack?.fullPath === track.fullPath ? 'active' : ''}`}
+                >
+                  <div className="queue-item-info">
+                    <div className="queue-item-title">{track.title || track.name}</div>
+                    <div className="queue-item-artist">{track.artist || 'Unknown Artist'}</div>
+                  </div>
+                  <button 
+                    className="queue-item-remove"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFromQueue(index);
+                    }}
+                    title="Remove from queue"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {shuffleQueue.length > 0 && isShuffleOn && (
+            <div className="queue-section">
+              <div className="queue-section-header">Shuffle Queue</div>
+              {shuffleQueue.map((track, index) => (
+                <div 
+                  key={`shuffle-${track.fullPath}-${index}`}
+                  className={`queue-item ${currentTrack?.fullPath === track.fullPath ? 'active' : ''}`}
+                >
+                  <div className="queue-item-info">
+                    <div className="queue-item-title">{track.title || track.name}</div>
+                    <div className="queue-item-artist">{track.artist || 'Unknown Artist'}</div>
+                  </div>
+                  <button 
+                    className="queue-item-remove"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFromQueue(userQueue.length + index);
+                    }}
+                    title="Remove from queue"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {userQueue.length === 0 && (!isShuffleOn || shuffleQueue.length === 0) && (
+            <div className="queue-empty">Queue is empty</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const handleTracklistScroll = () => {
+    if (!currentTrackRef.current || !tracklistRef.current) return;
+
+    const tracklistRect = tracklistRef.current.getBoundingClientRect();
+    const currentTrackRect = currentTrackRef.current.getBoundingClientRect();
+
+    // Check if the current track is out of view
+    const isOutOfView = 
+      currentTrackRect.top < tracklistRect.top || 
+      currentTrackRect.bottom > tracklistRect.bottom;
+
+    setShowJumpToCurrentButton(isOutOfView);
+    console.log('Jump button visibility:', isOutOfView);
+  };
+
+  const scrollToCurrentTrack = () => {
+    if (!currentTrackRef.current) return;
+    
+    currentTrackRef.current.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center'
+    });
+  };
 
   return (
     <div className="h-screen w-screen bg-gray-900 text-white relative">
@@ -296,19 +524,22 @@ export default function MediaPlayer() {
         expandToMin={true}
         onDragEnd={(sizes) => setSplitSizes(sizes)}
       >
-        {/* left side - Tracklist */}
+        {/* Left side - Tracklist */}
         <div className="h-full">
           {playlist.length > 0 ? (
             <Tracklist 
               playlist={playlist}
               currentTrack={currentTrack}
-              onTrackSelect={(track) => {
-                setCurrentTrack(track);
-                setIsPlaying(true);
-              }}
+              onTrackSelect={handleTrackSelect}
               onFolderSelect={selectFolder}
               folderPath={folderPath}
               onRefresh={refreshPlaylist}
+              onAddToQueue={addToQueue}
+              tracklistRef={tracklistRef}
+              currentTrackRef={currentTrackRef}
+              onScroll={handleTracklistScroll}
+              showJumpToCurrentButton={showJumpToCurrentButton}
+              onJumpToCurrentClick={scrollToCurrentTrack}
             />
           ) : (
             <div className="empty-tracklist">
@@ -320,7 +551,7 @@ export default function MediaPlayer() {
           )}
         </div>
 
-        {/* right side - Download */}
+        {/* Right side - Download */}
         <div className="h-full">
           <Download 
             tracklistFolder={folderPath} 
@@ -355,7 +586,7 @@ export default function MediaPlayer() {
             </>
           ) : (
             <>
-              {/* track info wala */}
+              {/* Track Info Section */}
               <div className="track-info">
                 <div className="track-image" onClick={toggleModal}>
                   {currentTrack ? (
@@ -391,7 +622,7 @@ export default function MediaPlayer() {
                 </div>
               </div>
 
-              {/* progress bar */}
+              {/* Progress Bar */}
               <div className="w-full mb-2">
                 <input
                   type="range"
@@ -434,10 +665,18 @@ export default function MediaPlayer() {
                 
                 <div className="volume-controls">
                   <button 
-                    onClick={() => setIsShuffleOn(!isShuffleOn)} 
+                    onClick={() => setIsShuffleOn(!isShuffleOn)}
                     className={`control-btn shuffle-btn ${isShuffleOn ? 'active' : ''}`}
+                    title="Shuffle"
                   >
-                    <Shuffle />
+                    <Shuffle size={16} />
+                  </button>
+                  <button 
+                    onClick={() => setIsQueueModalOpen(true)} 
+                    className="control-btn queue-btn"
+                    title="View Queue"
+                  >
+                    <List size={16} />
                   </button>
                   <button onClick={toggleMute} className="volume-button">
                     {volume === 0 || isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
@@ -465,7 +704,7 @@ export default function MediaPlayer() {
         </div>
       </div>
 
-      {/* Album art modal */}
+      {/* Add Modal */}
       {isModalOpen && currentTrack && (
         <div className="modal-overlay" onClick={toggleModal}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -488,6 +727,16 @@ export default function MediaPlayer() {
             />
           </div>
         </div>
+      )}
+
+      {/* Add Queue Modal */}
+      {isQueueModalOpen && (
+        <QueueModal 
+          userQueue={userQueue}
+          shuffleQueue={shuffleQueue}
+          onClose={() => setIsQueueModalOpen(false)}
+          currentTrack={currentTrack}
+        />
       )}
     </div>
   );

@@ -13,7 +13,7 @@ export default function Download({
   const [downloadDir, setDownloadDir] = useState<string>('');
   const [isDownloading, setIsDownloading] = useState(false);
 
-  // download directory
+  // Initialize download directory
   useEffect(() => {
     const initDownloadDir = async () => {
       if (window.electron?.getDefaultDownloadDir) {

@@ -1,15 +1,17 @@
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
-import { fork, spawn } from "child_process";  
+import { fork, spawn } from "child_process";  // fork matches server.mjs
 import fs from "fs";
-import * as mm from 'music-metadata'; 
+import * as mm from 'music-metadata';  // Add this import
 import os from "os";  // Add this import
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 let mainWindow;
 let serverProcess;
 let flaskProcess;
+
+
 
 // start express server alongside electron
 const startServer = () => {
@@ -29,18 +31,18 @@ const startFlaskServer = () => {
     ['-m', 'flask', 'run', '--port=5000'], 
     {
       cwd: path.join(__dirname, 'backend'),
-      stdio: 'pipe', 
+      stdio: 'pipe',  // Change from 'inherit' to 'pipe' to hide output
       env: {
         ...process.env,
         FLASK_APP: 'download.py',
         FLASK_ENV: 'development'
       },
       windowsHide: true,
-      detached: false  // prevent detachment
+      detached: false  // Change to false to prevent detachment
     }
   );
 
-  // debugging
+  // Optional: pipe output to console for debugging
   flaskProcess.stdout?.on('data', (data) => console.log(`Flask: ${data}`));
   flaskProcess.stderr?.on('data', (data) => console.error(`Flask error: ${data}`));
 
@@ -51,7 +53,7 @@ const startFlaskServer = () => {
 
 app.whenReady().then(() => {
   startServer();
-  startFlaskServer(); 
+  startFlaskServer();  // Start the Flask server
 
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -60,8 +62,10 @@ app.whenReady().then(() => {
     minHeight: 700,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
-      contextIsolation: true,   // earlier we were trying to do this with contextIsolation off, however we decided to preload for security
+      contextIsolation: true,
       nodeIntegration: false,
+      spellcheck: false,
+      enableWebSQL: false,
     },
   });
 
@@ -83,13 +87,41 @@ app.whenReady().then(() => {
     });
   });
 
+  // Move context menu creation here
+  const createContextMenu = (isEditable) => {
+    const template = [];
+    
+    if (isEditable) {
+      template.push(
+        { label: 'Cut', role: 'cut' },
+        { label: 'Copy', role: 'copy' },
+        { label: 'Paste', role: 'paste' }
+      );
+    } else {
+      template.push({ label: 'Copy', role: 'copy' });
+    }
+    
+    template.push(
+      { type: 'separator' },
+      { label: 'Select All', role: 'selectAll' }
+    );
+    
+    return Menu.buildFromTemplate(template);
+  };
+
+  // Add context menu handler
+  mainWindow.webContents.on('context-menu', (event, params) => {
+    event.preventDefault();
+    const menu = createContextMenu(params.isEditable);
+    menu.popup({ window: mainWindow });
+  });
+
   mainWindow.on("closed", () => {
     mainWindow = null;    // PREVENT MEMORY LEAKS
   });
 });
 
-
-// save album art to folder
+// Add this function after the imports
 async function saveAlbumArt(filePath) {
   try {
     const metadata = await mm.parseFile(filePath);
@@ -102,7 +134,7 @@ async function saveAlbumArt(filePath) {
       ? picture.format.split('/')[1] 
       : picture.format;
     
-    // create album-art directory in the same folder as the music file
+    // Create album-art directory in the same folder as the music file
     const dirPath = path.dirname(filePath);
     const albumArtDir = path.join(dirPath, 'album-art');
     
@@ -110,7 +142,7 @@ async function saveAlbumArt(filePath) {
       fs.mkdirSync(albumArtDir);
     }
 
-    // create filename based on the music file name
+    // Create a filename based on the music file name
     const musicFileName = path.basename(filePath, path.extname(filePath));
     const imageFileName = `${musicFileName}.${format}`;
     const imagePath = path.join(albumArtDir, imageFileName);
@@ -124,6 +156,7 @@ async function saveAlbumArt(filePath) {
   }
 }
 
+// Modify the existing select-folder handler
 ipcMain.handle("select-folder", async () => {
   if (!mainWindow) return [];
 
@@ -149,9 +182,7 @@ ipcMain.handle("select-folder", async () => {
   return [];
 });
 
-
-// IPC HANDLERS
-
+// Modify the get-metadata handler
 ipcMain.handle("get-metadata", async (_, filePath) => {
   try {
     const metadata = await mm.parseFile(filePath);
@@ -169,10 +200,12 @@ ipcMain.handle("get-metadata", async (_, filePath) => {
   }
 });
 
+// Add this IPC handler
 ipcMain.handle("get-file-url", async (_, filePath) => {
   return `http://localhost:3001/file?path=${encodeURIComponent(filePath)}`;
 });
 
+// Add this IPC handler with the other handlers
 ipcMain.handle("check-album-art-folder", async (_, folderPath) => {
   const albumArtDir = path.join(folderPath, 'album-art');
   
@@ -185,10 +218,12 @@ ipcMain.handle("check-album-art-folder", async (_, folderPath) => {
     .map(file => path.join(albumArtDir, file));
 });
 
+// Add this IPC handler to get the default download directory
 ipcMain.handle("get-default-download-dir", async () => {
   return path.join(os.homedir(), 'Downloads');
 });
 
+// Add this with your other IPC handlers
 ipcMain.handle("get-files-in-folder", async (_, folderPath) => {
   try {
     const files = fs.readdirSync(folderPath)
@@ -207,7 +242,7 @@ app.on("window-all-closed", () => {
 
 app.on('quit', () => {
   if (flaskProcess) {
-    // force kill
+    // Force kill the process and its children
     if (process.platform === 'win32') {
       spawn('taskkill', ['/pid', flaskProcess.pid, '/f', '/t']);
     } else {

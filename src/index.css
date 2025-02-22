@@ -1,6 +1,3 @@
-/* yes, we know this is a mess */
-
-
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap");
 
 :root {
@@ -41,6 +38,7 @@ body {
   height: 100vh;
 }
 
+/* Move "Serenade" to the top-left */
 .serenade-title {
   position: absolute;
   top: 20px;
@@ -54,7 +52,7 @@ body {
   text-shadow: 0 2px 10px rgba(124, 58, 237, 0.3);
   letter-spacing: -0.5px;
   transition: all 0.3s ease;
-  user-select: none;
+  user-select: none;  /* Make text non-selectable */
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
@@ -62,7 +60,7 @@ body {
 
 .serenade-title:hover {
   transform: translateY(-1px);
-  text-shadow: 0 4px 16px rgba(124, 58, 237, 0.5);
+  text-shadow: 0 4px 16px rgba(124, 58, 237, 0.5);  /* Just enhance the glow */
 }
 
 .media-controls-container {
@@ -73,18 +71,18 @@ body {
   padding: 1.5rem;
   background: rgb(30, 41, 59) !important;
   border-radius: 15px 15px 0 0;
-  z-index: 50;
+  z-index: 999;
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.2);
 }
 
-/* progress bar container */
+/* Progress bar container styles */
 .media-controls-container input[type="range"] {
   width: 100%;
   margin: 0;
   padding: 0;
 }
 
-/* time display */
+/* Time display container */
 .media-controls-container .flex.justify-between {
   display: flex;
   justify-content: space-between;
@@ -173,11 +171,26 @@ body {
 }
 
 /* song info */
-.song-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin-top: 1rem;
+.track-info {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 1rem !important;
+  position: absolute !important;
+  left: 1rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  min-height: 48px !important;
+  padding-top: 30px !important;
 }
+
+.track-name {
+  font-size: 0.9rem !important;
+  font-weight: 500 !important;
+  color: var(--text-light) !important;
+  line-height: 1.2 !important;
+  margin-top: 0 !important;
+}
+
 
 .artist-name {
   font-size: 1rem;
@@ -205,7 +218,11 @@ body {
 .control-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  background: var(--accent-hover);
+}
+
+.control-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .control-btn svg {
@@ -213,48 +230,6 @@ body {
   width: 24px;
   height: 24px;
 }
-
-.control-btn:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  background: var(--accent);
-  border: none;
-}
-
-
-.control-btn.shuffle-btn {
-  padding: 0.6rem;
-  background: var(--secondary-bg);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: all 0.2s ease;
-}
-
-.control-btn.shuffle-btn.active {
-  background: var(--accent);
-  border: none;
-  color: white;
-}
-
-.control-btn.shuffle-btn.active:hover {
-  background: var(--accent-hover);
-}
-
-.control-btn.shuffle-btn svg {
-  width: 16px;
-  height: 16px;
-}
-
-
-.control-btn.play-btn {
-  background: var(--accent);
-  border: none;
-  padding: 1.2rem;
-}
-
-.control-btn.play-btn:hover {
-  background: var(--accent-hover);
-}
-
 
 .controls-wrapper {
   display: flex;
@@ -305,19 +280,10 @@ body {
   box-shadow: 0 0 10px rgba(79, 70, 229, 0.4);
 }
 
+/* Make volume icon smaller */
 .volume-controls svg {
   width: 16px;
   height: 16px;
-}
-
-.track-info {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  position: absolute;
-  left: 1rem;
-  top: 50%;
-  transform: translateY(-50%);
 }
 
 .track-image {
@@ -346,15 +312,10 @@ body {
 }
 
 .track-details {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.track-name {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--text-light);
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.25rem !important;
+  padding-top: 20px !important;
 }
 
 .track-artist {
@@ -424,10 +385,18 @@ body {
   transform: scale(1.1);
 }
 
+/* Update play button specifically */
+.control-btn.play-btn {
+  background: var(--accent);
+  border: none;
+  padding: 1.2rem;
+}
 
+.control-btn.play-btn:hover {
+  background: var(--accent-hover);
+}
 
-
-/* folder select button */
+/* Update folder select button */
 .folder-btn {
   display: flex;
   align-items: center;
@@ -475,7 +444,7 @@ body {
   color: var(--text-light);
 }
 
-/* base styles for all range inputs */
+/* Base styles for all range inputs */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
@@ -483,7 +452,7 @@ input[type="range"] {
   cursor: pointer;
 }
 
-/* Volume slider */
+/* Volume slider specific styles */
 .volume-slider::-webkit-slider-runnable-track {
   -webkit-appearance: none;
   height: 4px;
@@ -514,7 +483,7 @@ input[type="range"] {
   box-shadow: 0 0 10px rgba(79, 70, 229, 0.4);
 }
 
-/* volume controls container */
+/* Volume controls container */
 .volume-controls {
   position: absolute;
   right: 1rem;
@@ -526,7 +495,7 @@ input[type="range"] {
   border-radius: 20px;
 }
 
-/* Tracklist modal */
+/* Tracklist Modal Styles */
 .tracklist-modal {
   background: var(--secondary-bg);
   padding: 2rem;
@@ -593,13 +562,6 @@ input[type="range"] {
   overflow: hidden;
 }
 
-.track-title {
-  font-size: 1rem;
-  color: var(--text-light);
-  font-weight: 500;
-  margin-bottom: 0.2rem;
-}
-
 .track-artist {
   font-size: 0.8rem;
   color: var(--text-dark);
@@ -608,15 +570,15 @@ input[type="range"] {
 .track-duration {
   color: var(--text-dark);
   font-size: 0.85rem;
-  margin-left: auto;  
-  font-variant-numeric: tabular-nums; /* number alignment */
+  margin-left: auto;  /* Push to the right */
+  font-variant-numeric: tabular-nums;  /* For better number alignment */
 }
 
 .tracklist-item.active .track-duration {
   color: var(--text-light);
 }
 
-/* make track name clickable (?? review later)*/
+/* Make track name clickable */
 .track-name {
   cursor: pointer;
   transition: color 0.2s ease;
@@ -626,7 +588,7 @@ input[type="range"] {
   color: var(--accent);
 }
 
-/* scrollbar */
+/* Scrollbar styles for the tracklist */
 .tracklist::-webkit-scrollbar {
   width: 6px;
 }
@@ -646,32 +608,28 @@ input[type="range"] {
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* app container */
+/* Base app container */
 .app-container {
   position: fixed !important;
   top: 60px !important;
   left: 0 !important;
   right: 0 !important;
-  bottom: 120px !important;
+  bottom: 140px !important;  /* Increased from 120px to give more space */
   padding: 1rem !important;
 }
 
-/* Split */
+/* Split container */
 .split {
   height: 100%;
   display: flex;
 }
 
-
-
-
-
-/* gutter style */
+/* Gutter style */
 .gutter {
   background: transparent;
   cursor: col-resize !important;
-  height: calc(100% - 14rem) !important;
-  margin-bottom: 14rem !important;
+  height: calc(100% - 14rem) !important;  /* Match container height */
+  margin-bottom: 14rem !important;  /* Match container margin */
 }
 
 .gutter.gutter-horizontal {
@@ -695,12 +653,12 @@ input[type="range"] {
 }
 
 .gutter.gutter-horizontal:hover::after {
-  width: 2px;  /* purple line width */
+  width: 2px;  /* Keep the purple line width same */
   background: var(--accent);
   box-shadow: 0 0 8px rgba(124, 58, 237, 0.3);
 }
 
-
+/* Individual panes */
 .split > div {
   height: 100%;
   padding: 0 8px;
@@ -710,9 +668,9 @@ input[type="range"] {
 .tracklist-container,
 .download-container,
 .empty-tracklist {
-  height: calc(100% - 14rem) !important;
-  margin-bottom: 14rem !important;
-  min-width: 400px !important;  /* minimum width */
+  height: calc(100% - 16rem) !important;  /* Increased from 14rem */
+  margin-bottom: 16rem !important;  /* Increased from 14rem */
+  min-width: 400px !important;
   background: var(--secondary-bg);
   backdrop-filter: blur(12px);
   border-radius: 20px;
@@ -721,9 +679,11 @@ input[type="range"] {
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 1;
 }
 
-/* Tracklist header */
+/* Tracklist header styles */
 .tracklist-header {
   display: flex !important;
   align-items: center !important;
@@ -735,7 +695,7 @@ input[type="range"] {
   display: flex !important;
   align-items: center !important;
   gap: 0.75rem !important;
-  flex-wrap: wrap !important;  /* handle long folder names */
+  flex-wrap: wrap !important;  /* Add this to handle long folder names */
 }
 
 .tracklist-title {
@@ -773,7 +733,40 @@ input[type="range"] {
   background: var(--hover-bg);
 }
 
-/* Minimized player */
+/* Add to your existing control-btn styles */
+.control-btn.active {
+  background: var(--accent);
+  border: none;
+}
+
+.control-btn.active:hover {
+  background: var(--accent-hover);
+}
+
+/* Update the shuffle button styles */
+.control-btn.shuffle-btn {
+  padding: 0.6rem;
+  background: var(--secondary-bg);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.control-btn.shuffle-btn.active {
+  background: var(--accent);
+  border: none;
+  color: white;
+}
+
+.control-btn.shuffle-btn.active:hover {
+  background: var(--accent-hover);
+}
+
+.control-btn.shuffle-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Fix minimized player */
 .media-controls-container {
   border-radius: 15px 15px 0 0 !important;  /* Only round top corners for full player */
 }
@@ -784,9 +777,9 @@ input[type="range"] {
   left: 50% !important;
   transform: translateX(-50%) !important;
   width: auto !important;
-  min-width: 300px !important;
-  max-width: 300px !important;
-  padding: 0.75rem 1rem !important;
+  min-width: 300px !important;  /* Reduced from 200px */
+  max-width: 300px !important;  /* Add max-width to constrain size */
+  padding: 0.75rem 1rem !important;  /* Slightly reduce padding */
   z-index: 100 !important;
   border-radius: 9999px !important;
   background: rgb(30, 41, 59) !important;
@@ -802,41 +795,14 @@ input[type="range"] {
   width: 100% !important;
 }
 
+/* Adjust minimized playback controls spacing */
 .media-controls-container.minimized .playback-controls {
   display: flex !important;
   align-items: center !important;
-  gap: 0.75rem !important;
+  gap: 0.75rem !important;  /* Slightly reduce gap */
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* Download styles */
+/* Download section styles */
 .download-container {
   display: flex !important;
   flex-direction: column !important;
@@ -882,7 +848,7 @@ input[type="range"] {
   gap: 0.5rem !important;
   padding: 0.75rem 1.5rem !important;
   background: var(--accent) !important;
-  border: 1.5px solid rgba(255, 255, 255, 0.5) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.5) !important;  /* Add consistent white border */
   border-radius: 12px !important;
   color: white !important;
   font-weight: 500 !important;
@@ -891,7 +857,7 @@ input[type="range"] {
 
 .download-button:hover {
   background: var(--accent-hover) !important;
-  border-color: rgba(255, 255, 255, 1) !important;
+  border-color: rgba(255, 255, 255, 1) !important;  /* Slightly more visible on hover */
   transform: translateY(-1px) !important;
 }
 
@@ -901,6 +867,7 @@ input[type="range"] {
   gap: 0.5rem !important;
 }
 
+/* Additional download styles */
 .download-content {
   display: flex !important;
   flex-direction: column !important;
@@ -943,7 +910,7 @@ input[type="range"] {
   cursor: not-allowed !important;
 }
 
-/* download button loading state */
+/* Download button loading state */
 .download-button.downloading {
   opacity: 0.8;
   cursor: not-allowed;
@@ -964,17 +931,7 @@ input[type="range"] {
   border: 1px solid rgba(79, 70, 229, 0.2) !important;
 }
 
-
-
-
-
-
-
-
-
-
-
-/* refresh button styles */
+/* Update refresh button styles */
 .refresh-btn {
   padding: 0.3rem !important;
   border-radius: 8px !important;
@@ -1000,7 +957,7 @@ input[type="range"] {
   transform: rotate(180deg) !important;
 }
 
-/* minimize/maximize button styles */
+/* Update minimize/maximize button styles */
 .minimize-btn,
 .maximize-btn {
   width: 32px !important;
@@ -1013,7 +970,7 @@ input[type="range"] {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  border-radius: 50% !important;
+  border-radius: 50% !important;  /* Make both buttons circular */
 }
 
 .minimize-btn:hover,
@@ -1021,9 +978,7 @@ input[type="range"] {
   background: var(--hover-bg) !important;
 }
 
-
-
-/* cursor pointer to specific buttons */
+/* Add cursor pointer to specific buttons */
 .folder-btn,
 .change-folder-btn,
 .refresh-btn,
@@ -1034,33 +989,26 @@ input[type="range"] {
   cursor: pointer;
 }
 
-/* disable pointer events for specific buttons */
+/* Keep default cursor for media controls and min/max buttons */
 .control-btn:not(.shuffle-btn),
 .minimize-btn,
 .maximize-btn {
   cursor: default;
 }
 
-
-
-
-
 /* Progress bar container */
 .w-full.mb-2 {
-  margin-bottom: 1.5rem !important;
+  margin-bottom: 1.5rem !important;  /* Increase space below progress bar */
 }
 
-
-
-/* minimized playback controls */
+/* Adjust minimized playback controls */
 .media-controls-container.minimized .playback-controls {
   display: flex !important;
   align-items: center !important;
   gap: 1rem !important;
 }
 
-
-/* icon alignment in control buttons */
+/* Fix icon alignment in control buttons */
 .control-btn,
 .control-btn.shuffle-btn,
 .volume-button,
@@ -1069,25 +1017,400 @@ input[type="range"] {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  line-height: 0 !important;
+  line-height: 0 !important;  /* Remove extra space from line height */
 }
-/* ENSURING SVG icons are centered */
+
+/* Ensure SVG icons are centered */
 .control-btn svg,
 .control-btn.shuffle-btn svg,
 .volume-button svg,
 .minimize-btn svg,
 .maximize-btn svg {
-  display: block !important;
+  display: block !important;  /* Remove inline spacing */
 }
 
-/* track artist styles */
+/* Track artist styles */
 .track-artist-small {
   font-size: 0.85rem;
-  color: var(--text-dark);
+  color: var(--text-dark);  /* Use the muted gray color */
 }
+
+/* Keep artist color muted even when track is active */
 .tracklist-item.active .track-artist-small {
-  color: var(--text-dark);
+  color: var(--text-dark);  /* Keep the muted color even when track is selected */
 }
+
+/* But keep the title white when track is active */
 .tracklist-item.active .track-title {
   color: var(--text-light);
 }
+
+/* Update text selection styles to be more specific */
+.tracklist-container ::selection,
+.download-container ::selection,
+.media-controls-container ::selection {
+  background: var(--accent);
+  color: white;
+  text-shadow: none;
+}
+
+/* Update input selection styles */
+.download-input::selection {
+  background: var(--accent);
+  color: white;
+}
+
+/* Update focus styles */
+.download-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  border-color: var(--accent);
+}
+
+/* Make specific elements selectable */
+.track-title {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: default;
+}
+
+.track-artist-small {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: default;
+}
+
+.folder-name {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: default;
+}
+
+/* Keep download input styles */
+.download-input {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  cursor: text !important;
+}
+
+/* Override hover styles for track items */
+.tracklist-item:hover {
+  cursor: pointer;
+}
+
+.tracklist-item:hover .track-title,
+.tracklist-item:hover .track-artist-small {
+  cursor: pointer;
+}
+
+/* Context Menu Styles */
+.context-menu {
+  position: fixed;
+  background: var(--secondary-bg);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0.5rem;
+  min-width: 160px;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(12px);
+  user-select: none;
+}
+
+.context-menu-item {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  text-align: left;
+  color: var(--text-light);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  font-size: 0.9rem;
+  background: transparent;
+  border: none;
+}
+
+.context-menu-item:hover {
+  background: var(--hover-bg);
+  color: var(--accent);
+}
+
+.context-menu-item:active {
+  transform: scale(0.98);
+}
+
+/* Queue Modal Styles */
+.queue-modal {
+  background: var(--secondary-bg);
+  border-radius: 15px;
+  width: 400px;
+  max-height: 80vh;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.queue-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.queue-modal-header h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-light);
+  margin: 0;
+}
+
+.queue-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  transition: all 0.2s ease;
+  position: relative;
+  padding-right: 3rem; /* Make space for remove button */
+}
+
+.queue-item:hover {
+  background: var(--hover-bg);
+}
+
+.queue-item.active {
+  background: var(--active-bg);
+  border: 1px solid var(--accent);
+}
+
+.queue-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.queue-item-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-light);
+  margin-bottom: 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-item-artist {
+  font-size: 0.8rem;
+  color: var(--text-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-empty {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-dark);
+  font-size: 0.9rem;
+}
+
+/* Queue button styles */
+.control-btn.queue-btn {
+  padding: 0.6rem;
+  background: var(--secondary-bg);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.control-btn.queue-btn:hover {
+  background: var(--hover-bg);
+}
+
+/* Update scrollbar styles for queue list */
+.queue-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.queue-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.queue-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.queue-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Queue item remove button */
+.queue-item {
+  position: relative;
+  padding-right: 3rem; /* Make space for remove button */
+}
+
+.queue-item-remove {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 0.4rem;
+  border-radius: 50%;
+  color: var(--text-dark);
+  opacity: 0;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.queue-item:hover .queue-item-remove {
+  opacity: 1;
+}
+
+.queue-item-remove:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-light);
+}
+
+.queue-item-remove:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+/* Add these styles to your existing CSS */
+
+.queue-section {
+  margin-bottom: 1.5rem;
+}
+
+.queue-section:last-child {
+  margin-bottom: 0;
+}
+
+.queue-section-header {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 0.5rem;
+}
+
+/* Update existing queue styles to work with sections */
+.queue-list {
+  padding: 0.5rem;
+}
+
+.queue-item {
+  margin: 0.5rem;
+}
+
+/* Update the jump to current track button styles */
+.jump-to-current-btn {
+  position: fixed;
+  bottom: 70px;  /* Increased from 160px to 200px to move it much higher */
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent);
+  color: white;
+  padding: 0.75rem 1.25rem;
+  border-radius: 9999px;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.3);
+  transition: all 0.2s ease;
+  z-index: 1000;
+  font-size: 0.9rem;
+  opacity: 0;
+  animation: fadeIn 0.2s ease forwards;
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.jump-to-current-btn:hover {
+  background: var(--accent-hover);
+  transform: translateX(-50%) translateY(-2px);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
+}
+
+.jump-to-current-btn:active {
+  transform: translateX(-50%) translateY(0);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);  /* Increased initial offset */
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Update tracklist to handle overflow properly */
+.tracklist {
+  position: relative;
+  overflow-y: auto;
+  height: calc(100% - 4rem);  /* Adjust based on your header height */
+  padding-bottom: 1rem;
+}
+
+/* Visualizer styles */
+.visualizer-container {
+  position: absolute;
+  top: -60px;  /* Position above the controls */
+  left: 0;
+  right: 0;
+  height: 50px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;  /* Allow clicking through */
+}
+
+/* Update visualizer button styles */
+.control-btn.visualizer-btn {
+  padding: 0.6rem;
+  background: var(--secondary-bg);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+  opacity: 0.5;
+}
+
+.control-btn.visualizer-btn:not(:disabled) {
+  opacity: 1;
+  cursor: pointer;
+}
+
+.control-btn.visualizer-btn.active {
+  background: var(--accent);
+  border: none;
+  color: white;
+}
+
+.control-btn.visualizer-btn.active:hover {
+  background: var(--accent-hover);
+}
+
+.control-btn.visualizer-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+
+

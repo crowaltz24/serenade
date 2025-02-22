@@ -21,7 +21,7 @@ def get_song_info():
         return jsonify({'error': 'No URL provided'}), 400
 
     try:
-        # we can use  spotdl's track info command
+        # Using spotdl's track-info command
         info_process = subprocess.run(['spotdl', url, '--track-info'], 
                                    capture_output=True, text=True)
         output = info_process.stdout.strip()

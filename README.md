@@ -13,7 +13,7 @@ A lightweight, open-source music player built with Electron and React, featuring
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/serenade.git
+git clone https://github.com/crowaltz24/serenade.git
 cd serenade
 
 # Install dependencies

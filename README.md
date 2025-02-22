@@ -1,6 +1,6 @@
 # Serenade – Open Source Music Player & Visualizer  
 
-Serenade is a lightweight, open-source **local music player** built with **Electron + React**, featuring real-time **audio visualization** and a sleek UI.  
+Serenade is a lightweight, open-source **local music player** built with **Electron + React**, soon to be featuring real-time **audio visualization** and a sleek UI.  
 
 ## ✨ Features  
 - Play local audio files with a smooth UI  

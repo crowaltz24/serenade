@@ -24,7 +24,7 @@ body {
   height: 100vh;
 }
 
-/* player container */
+/* media player container */
 .player-container {
   background: var(--secondary-bg);
   padding: 2rem;

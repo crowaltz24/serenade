@@ -1,6 +1,6 @@
 # Serenade
 
-A lightweight, open-source music player built with Electron and React, featuring local playback, and music downloading capabilities, with planned audio visualization features. Created for FOSS Hack 2025.
+A lightweight, open-source music player built with Electron and React, featuring local playback, music organization and downloading capabilities as well as audio visualization features. Created for FOSS Hack 2025.
 
 ## Features
 - Local audio file playback with modern UI

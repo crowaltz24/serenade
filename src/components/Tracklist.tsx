@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { type Track } from './MediaPlayer';
-import { Folder, RefreshCw, ArrowUp } from 'lucide-react';
+import { useState, useEffect, MouseEvent as ReactMouseEvent } from 'react';
+import type { Track } from '../electron';
+import { Folder, RefreshCw, Music } from 'lucide-react';
 
 interface TracklistProps {
   playlist: Track[];
@@ -23,6 +23,24 @@ interface ContextMenu {
   track: Track;
 }
 
+const calculateMenuPosition = (e: ReactMouseEvent<HTMLDivElement>) => {
+  const x = e.clientX;
+  const y = e.clientY - 50; 
+  
+  const menuWidth = 160;
+  const menuHeight = 40;
+  
+  
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  
+  // adjust position if menu would go off screen
+  const adjustedX = Math.min(x, vw - menuWidth);
+  const adjustedY = Math.max(40, Math.min(y, vh - menuHeight));
+  
+  return { x: adjustedX, y: adjustedY };
+};
+
 export default function Tracklist({ 
   playlist, 
   currentTrack, 
@@ -41,7 +59,7 @@ export default function Tracklist({
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
 
   useEffect(() => {
-    // Load durations for all tracks
+    // load durations for all tracks
     playlist.forEach(async (track) => {
       const audio = new Audio(await window.electron.getFileUrl(track.fullPath));
       audio.addEventListener('loadedmetadata', () => {
@@ -55,33 +73,17 @@ export default function Tracklist({
 
   const folderName = folderPath.split('/').pop() || '';
 
-  const handleContextMenu = (e: React.MouseEvent<HTMLDivElement>, track: Track) => {
+  const handleContextMenu = (e: ReactMouseEvent<HTMLDivElement>, track: Track) => {
     e.preventDefault();
     e.stopPropagation();
     
-    const x = e.pageX;
-    const y = e.pageY;
-    
-    // get viewport dimensions
-    const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-    const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-    
-    const menuWidth = 160;
-    const menuHeight = 40;
-    
-    const adjustedX = Math.min(x, vw - menuWidth - 10);
-    const adjustedY = Math.min(y, vh - menuHeight - 10);
-    
-    setContextMenu({
-      x: adjustedX,
-      y: adjustedY,
-      track
-    });
+    const { x, y } = calculateMenuPosition(e);
+    setContextMenu({ x, y, track });
   };
 
-
+  
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: globalThis.MouseEvent) => {
       if (contextMenu && !(e.target as Element).closest('.context-menu')) {
         setContextMenu(null);
       }
@@ -107,16 +109,29 @@ export default function Tracklist({
   return (
     <div className="tracklist-container">
       <div className="tracklist-header">
-        <h2 className="tracklist-title">Tracklist</h2>
-        <div className="tracklist-actions">
+        <div className="tracklist-title">Tracklist</div>
+        <div className="tracklist-controls">
           {folderPath && <span className="folder-name">{folderName}</span>}
-          <button onClick={onRefresh} className="refresh-btn" title="Refresh tracklist">
+          <button 
+            onClick={onRefresh}
+            className="control-btn"
+          >
             <RefreshCw size={16} />
           </button>
-          <button onClick={onFolderSelect} className="change-folder-btn">
+          <button 
+            onClick={onFolderSelect} 
+            className="control-btn"
+          >
             <Folder size={16} />
-            Change Folder
           </button>
+          {showJumpToCurrentButton && (
+            <button 
+              onClick={onJumpToCurrentClick}
+              className="control-btn"
+            >
+              <Music size={16} />
+            </button>
+          )}
         </div>
       </div>
       <div 
@@ -147,19 +162,6 @@ export default function Tracklist({
         ))}
       </div>
 
-      {/* Add Jump to Current button */}
-      {showJumpToCurrentButton && currentTrack && (
-        <button 
-          className="jump-to-current-btn"
-          onClick={onJumpToCurrentClick}
-          title="Jump to current track"
-        >
-          <ArrowUp size={16} />
-          <span>Current Track</span>
-        </button>
-      )}
-
-      {/* Update the context menu JSX */}
       {contextMenu && (
         <div 
           className="context-menu"
@@ -167,7 +169,13 @@ export default function Tracklist({
             position: 'fixed',
             top: `${contextMenu.y}px`,
             left: `${contextMenu.x}px`,
-            zIndex: 1000,
+            zIndex: 9999,
+            background: 'var(--secondary-bg)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '8px',
+            padding: '4px 0',
+            minWidth: '160px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -177,6 +185,19 @@ export default function Tracklist({
               onAddToQueue(contextMenu.track);
               setContextMenu(null);
             }}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              textAlign: 'left',
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-light)',
+              cursor: 'pointer',
+              transition: 'background 0.2s',
+              fontSize: '0.9rem'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
           >
             Add to Queue
           </button>

@@ -1,3 +1,5 @@
+/* Yeah, we know this sucks */
+
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap");
 
 :root {
@@ -38,7 +40,6 @@ body {
   height: 100vh;
 }
 
-/* Move "Serenade" to the top-left */
 .serenade-title {
   position: absolute;
   top: 20px;
@@ -52,7 +53,7 @@ body {
   text-shadow: 0 2px 10px rgba(124, 58, 237, 0.3);
   letter-spacing: -0.5px;
   transition: all 0.3s ease;
-  user-select: none;  /* Make text non-selectable */
+  user-select: none;  
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
@@ -60,7 +61,7 @@ body {
 
 .serenade-title:hover {
   transform: translateY(-1px);
-  text-shadow: 0 4px 16px rgba(124, 58, 237, 0.5);  /* Just enhance the glow */
+  text-shadow: 0 4px 16px rgba(124, 58, 237, 0.5);  
 }
 
 .media-controls-container {
@@ -75,14 +76,14 @@ body {
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.2);
 }
 
-/* Progress bar container styles */
+/* progress bar container styles */
 .media-controls-container input[type="range"] {
   width: 100%;
   margin: 0;
   padding: 0;
 }
 
-/* Time display container */
+/* time display container */
 .media-controls-container .flex.justify-between {
   display: flex;
   justify-content: space-between;
@@ -119,7 +120,7 @@ body {
 
 .progress-bar::-webkit-slider-runnable-track {
   -webkit-appearance: none;
-  height: inherit;
+  height: 6px;
   border-radius: 3px;
   background: linear-gradient(
     to right,
@@ -138,7 +139,7 @@ body {
   border-radius: 50%;
   transition: all 0.2s ease;
   opacity: 0;
-  margin-top: -4px;
+  margin-top: -3px;
   box-shadow: 0 0 10px rgba(79, 70, 229, 0.4);
 }
 
@@ -147,7 +148,7 @@ body {
   transform: scale(1.2);
 }
 
-/* player container */
+
 .player-container {
   background: var(--secondary-bg);
   padding: 2rem;
@@ -173,31 +174,121 @@ body {
 /* song info */
 .track-info {
   display: flex !important;
-  align-items: flex-start !important;
-  gap: 1rem !important;
+  align-items: center !important;
+  gap: 1.25rem !important;
   position: absolute !important;
-  left: 1rem !important;
-  top: 50% !important;
+  left: 1.5rem !important;
+  top: calc(50% + 1.75rem) !important;
   transform: translateY(-50%) !important;
-  min-height: 48px !important;
-  padding-top: 30px !important;
+  height: 56px !important;
+  pointer-events: none !important; 
 }
 
+
+.track-details {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.35rem !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  min-width: 0 !important;
+  max-width: 300px !important;
+  pointer-events: auto !important;
+}
+
+/* track name container */
 .track-name {
-  font-size: 0.9rem !important;
-  font-weight: 500 !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
   color: var(--text-light) !important;
-  line-height: 1.2 !important;
-  margin-top: 0 !important;
+  width: 300px !important;
+  overflow: hidden !important;
+  position: relative !important;
 }
 
+
+.track-name::after {
+  content: '' !important;
+  position: absolute !important;
+  right: 0 !important;
+  top: 0 !important;
+  height: 100% !important;
+  width: 40px !important;
+  background: linear-gradient(to right, transparent, var(--secondary-bg)) !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  transition: opacity 0.2s ease !important;
+}
+
+
+.track-name:has(.track-name-inner.overflow)::after {
+  opacity: 1 !important;
+}
+
+
+.track-name-inner.overflow:hover + .track-name::after {
+  opacity: 0 !important;
+}
+
+
+.track-name-inner {
+  display: inline-block !important;
+  white-space: nowrap !important;
+  position: relative !important;
+}
+
+.track-name-inner.overflow {
+  animation: scroll 8s linear infinite !important;
+}
+
+@keyframes scroll {
+  0%, 25% {
+    transform: translate3d(0, 0, 0);
+  }
+  85%, 100% {
+    transform: translate3d(calc(-100% + 300px), 0, 0);
+  }
+}
+
+/* update track image */
+.track-image {
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  position: relative !important;
+  cursor: pointer !important; 
+  pointer-events: auto !important; 
+  backface-visibility: hidden !important; 
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  background: #1a1b26 !important; 
+  flex-shrink: 0 !important; 
+}
+
+.track-image img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  pointer-events: none !important; 
+}
+
+.track-image:hover {
+  transform: scale(1.05) translateZ(0) !important;
+}
+
+
+.track-details {
+  pointer-events: auto !important;
+}
 
 .artist-name {
   font-size: 1rem;
   color: var(--text-dark);
 }
 
-/* controls */
+
 .controls {
   display: flex;
   justify-content: center;
@@ -280,29 +371,18 @@ body {
   box-shadow: 0 0 10px rgba(79, 70, 229, 0.4);
 }
 
-/* Make volume icon smaller */
+
 .volume-controls svg {
   width: 16px;
   height: 16px;
 }
 
-.track-image {
-  width: 48px;
-  height: 48px;
-  border-radius: 6px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: transform 0.2s;
-}
-
-.track-image:hover {
-  transform: scale(1.05);
-}
-
 .album-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  background: #1a1b26 !important; /* Dark background for empty state */
 }
 
 .placeholder-img {
@@ -311,16 +391,14 @@ body {
   background: #333;
 }
 
-.track-details {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 0.25rem !important;
-  padding-top: 20px !important;
-}
-
 .track-artist {
-  font-size: 0.8rem;
-  color: var(--text-dark);
+  font-size: 0.9rem !important;
+  color: var(--text-dark) !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 300px !important;
 }
 
 .modal-overlay {
@@ -343,10 +421,11 @@ body {
 }
 
 .modal-image {
-  max-width: 100%;
-  max-height: 90vh;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  max-width: 90vw !important;
+  max-height: 90vh !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+  background: #1a1b26 !important; /* Dark background for empty state */
 }
 
 .modal-close {
@@ -385,7 +464,7 @@ body {
   transform: scale(1.1);
 }
 
-/* Update play button specifically */
+
 .control-btn.play-btn {
   background: var(--accent);
   border: none;
@@ -396,7 +475,7 @@ body {
   background: var(--accent-hover);
 }
 
-/* Update folder select button */
+/*  folder select button */
 .folder-btn {
   display: flex;
   align-items: center;
@@ -422,7 +501,7 @@ body {
   transform: translateY(0);
 }
 
-/* Update skip buttons */
+/*  skip buttons */
 .control-btn.skip-btn {
   background: rgba(255, 255, 255, 0.08);
   padding: 10px;
@@ -444,7 +523,7 @@ body {
   color: var(--text-light);
 }
 
-/* Base styles for all range inputs */
+
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
@@ -452,7 +531,7 @@ input[type="range"] {
   cursor: pointer;
 }
 
-/* Volume slider specific styles */
+/* volume slider specific styles */
 .volume-slider::-webkit-slider-runnable-track {
   -webkit-appearance: none;
   height: 4px;
@@ -483,7 +562,7 @@ input[type="range"] {
   box-shadow: 0 0 10px rgba(79, 70, 229, 0.4);
 }
 
-/* Volume controls container */
+/* volume controls container */
 .volume-controls {
   position: absolute;
   right: 1rem;
@@ -495,7 +574,7 @@ input[type="range"] {
   border-radius: 20px;
 }
 
-/* Tracklist Modal Styles */
+/* tracklist Modal Styles */
 .tracklist-modal {
   background: var(--secondary-bg);
   padding: 2rem;
@@ -570,15 +649,15 @@ input[type="range"] {
 .track-duration {
   color: var(--text-dark);
   font-size: 0.85rem;
-  margin-left: auto;  /* Push to the right */
-  font-variant-numeric: tabular-nums;  /* For better number alignment */
+  margin-left: auto;  
+  font-variant-numeric: tabular-nums;  
 }
 
 .tracklist-item.active .track-duration {
   color: var(--text-light);
 }
 
-/* Make track name clickable */
+
 .track-name {
   cursor: pointer;
   transition: color 0.2s ease;
@@ -588,7 +667,7 @@ input[type="range"] {
   color: var(--accent);
 }
 
-/* Scrollbar styles for the tracklist */
+/* scrollbar styles for the tracklist */
 .tracklist::-webkit-scrollbar {
   width: 6px;
 }
@@ -608,28 +687,28 @@ input[type="range"] {
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* Base app container */
+/* base app container */
 .app-container {
   position: fixed !important;
   top: 60px !important;
   left: 0 !important;
   right: 0 !important;
-  bottom: 140px !important;  /* Increased from 120px to give more space */
+  bottom: 14px !important;  
   padding: 1rem !important;
 }
 
-/* Split container */
+
 .split {
   height: 100%;
   display: flex;
 }
 
-/* Gutter style */
+/* gutter style */
 .gutter {
   background: transparent;
   cursor: col-resize !important;
-  height: calc(100% - 14rem) !important;  /* Match container height */
-  margin-bottom: 14rem !important;  /* Match container margin */
+  height: calc(100% - 14rem) !important;  
+  margin-bottom: 14rem !important;        
 }
 
 .gutter.gutter-horizontal {
@@ -653,23 +732,23 @@ input[type="range"] {
 }
 
 .gutter.gutter-horizontal:hover::after {
-  width: 2px;  /* Keep the purple line width same */
+  width: 2px;  
   background: var(--accent);
   box-shadow: 0 0 8px rgba(124, 58, 237, 0.3);
 }
 
-/* Individual panes */
+/* individual panes */
 .split > div {
   height: 100%;
   padding: 0 8px;
 }
 
-/* Container styles */
+/* container styles */
 .tracklist-container,
 .download-container,
 .empty-tracklist {
-  height: calc(100% - 16rem) !important;  /* Increased from 14rem */
-  margin-bottom: 16rem !important;  /* Increased from 14rem */
+  height: calc(100% - 14rem) !important;  
+  margin-bottom: 14rem !important;        
   min-width: 400px !important;
   background: var(--secondary-bg);
   backdrop-filter: blur(12px);
@@ -683,19 +762,29 @@ input[type="range"] {
   z-index: 1;
 }
 
-/* Tracklist header styles */
+/* tracklist header styles */
 .tracklist-header {
   display: flex !important;
-  align-items: center !important;
   justify-content: space-between !important;
-  margin-bottom: 1.5rem !important;
+  align-items: center !important;
+  padding: 1rem !important;
+  border-bottom: 1px solid var(--border-color) !important;
 }
 
-.tracklist-actions {
+.tracklist-controls {
   display: flex !important;
-  align-items: center !important;
-  gap: 0.75rem !important;
-  flex-wrap: wrap !important;  /* Add this to handle long folder names */
+  gap: 0.5rem !important;
+}
+
+.tracklist-controls .control-btn {
+  padding: 0.5rem !important;
+  border-radius: 0.375rem !important;
+  background: var(--secondary-bg) !important;
+  transition: all 0.2s ease !important;
+}
+
+.tracklist-controls .control-btn:hover {
+  background: var(--hover-bg) !important;
 }
 
 .tracklist-title {
@@ -714,6 +803,7 @@ input[type="range"] {
   padding: 0.3rem 0.8rem !important;
   background: rgba(255, 255, 255, 0.1) !important;
   border-radius: 12px !important;
+  margin-right: 0.5rem !important;
 }
 
 .change-folder-btn {
@@ -733,7 +823,7 @@ input[type="range"] {
   background: var(--hover-bg);
 }
 
-/* Add to your existing control-btn styles */
+
 .control-btn.active {
   background: var(--accent);
   border: none;
@@ -743,7 +833,7 @@ input[type="range"] {
   background: var(--accent-hover);
 }
 
-/* Update the shuffle button styles */
+
 .control-btn.shuffle-btn {
   padding: 0.6rem;
   background: var(--secondary-bg);
@@ -766,9 +856,9 @@ input[type="range"] {
   height: 16px;
 }
 
-/* Fix minimized player */
+
 .media-controls-container {
-  border-radius: 15px 15px 0 0 !important;  /* Only round top corners for full player */
+  border-radius: 15px 15px 0 0 !important;  
 }
 
 .media-controls-container.minimized {
@@ -777,9 +867,9 @@ input[type="range"] {
   left: 50% !important;
   transform: translateX(-50%) !important;
   width: auto !important;
-  min-width: 300px !important;  /* Reduced from 200px */
-  max-width: 300px !important;  /* Add max-width to constrain size */
-  padding: 0.75rem 1rem !important;  /* Slightly reduce padding */
+  min-width: 300px !important;  
+  max-width: 300px !important; 
+  padding: 0.75rem 1rem !important;  
   z-index: 100 !important;
   border-radius: 9999px !important;
   background: rgb(30, 41, 59) !important;
@@ -795,14 +885,14 @@ input[type="range"] {
   width: 100% !important;
 }
 
-/* Adjust minimized playback controls spacing */
+/*  minimized playback controls spacing */
 .media-controls-container.minimized .playback-controls {
   display: flex !important;
   align-items: center !important;
-  gap: 0.75rem !important;  /* Slightly reduce gap */
+  gap: 0.75rem !important;  
 }
 
-/* Download section styles */
+/* download section styles */
 .download-container {
   display: flex !important;
   flex-direction: column !important;
@@ -821,7 +911,7 @@ input[type="range"] {
 
 .download-input {
   width: 100% !important;
-  padding: 0.75rem 1rem !important;
+  padding: 0.75rem 2.5rem 0.75rem 1rem !important; 
   background: rgba(255, 255, 255, 0.05) !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
   border-radius: 12px !important;
@@ -848,7 +938,7 @@ input[type="range"] {
   gap: 0.5rem !important;
   padding: 0.75rem 1.5rem !important;
   background: var(--accent) !important;
-  border: 1.5px solid rgba(255, 255, 255, 0.5) !important;  /* Add consistent white border */
+  border: 1.5px solid rgba(255, 255, 255, 0.5) !important;  
   border-radius: 12px !important;
   color: white !important;
   font-weight: 500 !important;
@@ -857,7 +947,7 @@ input[type="range"] {
 
 .download-button:hover {
   background: var(--accent-hover) !important;
-  border-color: rgba(255, 255, 255, 1) !important;  /* Slightly more visible on hover */
+  border-color: rgba(255, 255, 255, 1) !important;  
   transform: translateY(-1px) !important;
 }
 
@@ -867,7 +957,7 @@ input[type="range"] {
   gap: 0.5rem !important;
 }
 
-/* Additional download styles */
+
 .download-content {
   display: flex !important;
   flex-direction: column !important;
@@ -910,7 +1000,7 @@ input[type="range"] {
   cursor: not-allowed !important;
 }
 
-/* Download button loading state */
+/* download button loading state */
 .download-button.downloading {
   opacity: 0.8;
   cursor: not-allowed;
@@ -927,11 +1017,11 @@ input[type="range"] {
 
 .download-message.progress {
   background: rgba(79, 70, 229, 0.1) !important;
-  color: var(--accent) !important;
+  color: var(--text-light) !important;
   border: 1px solid rgba(79, 70, 229, 0.2) !important;
 }
 
-/* Update refresh button styles */
+/*  refresh button styles */
 .refresh-btn {
   padding: 0.3rem !important;
   border-radius: 8px !important;
@@ -957,7 +1047,7 @@ input[type="range"] {
   transform: rotate(180deg) !important;
 }
 
-/* Update minimize/maximize button styles */
+/*  minimize/maximize button styles */
 .minimize-btn,
 .maximize-btn {
   width: 32px !important;
@@ -970,7 +1060,7 @@ input[type="range"] {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  border-radius: 50% !important;  /* Make both buttons circular */
+  border-radius: 50% !important;  
 }
 
 .minimize-btn:hover,
@@ -978,7 +1068,7 @@ input[type="range"] {
   background: var(--hover-bg) !important;
 }
 
-/* Add cursor pointer to specific buttons */
+
 .folder-btn,
 .change-folder-btn,
 .refresh-btn,
@@ -989,26 +1079,26 @@ input[type="range"] {
   cursor: pointer;
 }
 
-/* Keep default cursor for media controls and min/max buttons */
+/* keep default cursor for media controls and min/max buttons */
 .control-btn:not(.shuffle-btn),
 .minimize-btn,
 .maximize-btn {
   cursor: default;
 }
 
-/* Progress bar container */
+/* Progress bar container FIX */
 .w-full.mb-2 {
-  margin-bottom: 1.5rem !important;  /* Increase space below progress bar */
+  margin-bottom: 1.5rem !important;  
 }
 
-/* Adjust minimized playback controls */
+/*  minimized playback controls FIX */
 .media-controls-container.minimized .playback-controls {
   display: flex !important;
   align-items: center !important;
   gap: 1rem !important;
 }
 
-/* Fix icon alignment in control buttons */
+/*control buttons FIX */
 .control-btn,
 .control-btn.shuffle-btn,
 .volume-button,
@@ -1017,35 +1107,35 @@ input[type="range"] {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  line-height: 0 !important;  /* Remove extra space from line height */
+  line-height: 0 !important;  
 }
 
-/* Ensure SVG icons are centered */
+
 .control-btn svg,
 .control-btn.shuffle-btn svg,
 .volume-button svg,
 .minimize-btn svg,
 .maximize-btn svg {
-  display: block !important;  /* Remove inline spacing */
+  display: block !important;  
 }
 
-/* Track artist styles */
+/* track artist styles */
 .track-artist-small {
   font-size: 0.85rem;
-  color: var(--text-dark);  /* Use the muted gray color */
+  color: var(--text-dark);  
 }
 
-/* Keep artist color muted even when track is active */
+
 .tracklist-item.active .track-artist-small {
-  color: var(--text-dark);  /* Keep the muted color even when track is selected */
+  color: var(--text-dark);  
 }
 
-/* But keep the title white when track is active */
+/* keep the title white when track is active */
 .tracklist-item.active .track-title {
   color: var(--text-light);
 }
 
-/* Update text selection styles to be more specific */
+
 .tracklist-container ::selection,
 .download-container ::selection,
 .media-controls-container ::selection {
@@ -1054,20 +1144,20 @@ input[type="range"] {
   text-shadow: none;
 }
 
-/* Update input selection styles */
+
 .download-input::selection {
   background: var(--accent);
   color: white;
 }
 
-/* Update focus styles */
+
 .download-input:focus {
   outline: 2px solid var(--accent);
   outline-offset: -1px;
   border-color: var(--accent);
 }
 
-/* Make specific elements selectable */
+
 .track-title {
   user-select: text;
   -webkit-user-select: text;
@@ -1086,14 +1176,14 @@ input[type="range"] {
   cursor: default;
 }
 
-/* Keep download input styles */
+
 .download-input {
   user-select: text !important;
   -webkit-user-select: text !important;
   cursor: text !important;
 }
 
-/* Override hover styles for track items */
+/* override hover styles for track items */
 .tracklist-item:hover {
   cursor: pointer;
 }
@@ -1103,7 +1193,7 @@ input[type="range"] {
   cursor: pointer;
 }
 
-/* Context Menu Styles */
+
 .context-menu {
   position: fixed;
   background: var(--secondary-bg);
@@ -1140,7 +1230,7 @@ input[type="range"] {
   transform: scale(0.98);
 }
 
-/* Queue Modal Styles */
+
 .queue-modal {
   background: var(--secondary-bg);
   border-radius: 15px;
@@ -1173,15 +1263,10 @@ input[type="range"] {
 }
 
 .queue-item {
-  display: flex;
-  align-items: center;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  margin-bottom: 0.5rem;
-  background: rgba(255, 255, 255, 0.05);
-  transition: all 0.2s ease;
-  position: relative;
-  padding-right: 3rem; /* Make space for remove button */
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+  padding: 0.5rem !important;
 }
 
 .queue-item:hover {
@@ -1223,19 +1308,20 @@ input[type="range"] {
   font-size: 0.9rem;
 }
 
-/* Queue button styles */
+
 .control-btn.queue-btn {
   padding: 0.6rem;
   background: var(--secondary-bg);
   border: 1px solid rgba(255, 255, 255, 0.1);
   transition: all 0.2s ease;
+  cursor:pointer;
 }
 
 .control-btn.queue-btn:hover {
   background: var(--hover-bg);
 }
 
-/* Update scrollbar styles for queue list */
+
 .queue-list::-webkit-scrollbar {
   width: 6px;
 }
@@ -1254,25 +1340,23 @@ input[type="range"] {
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* Queue item remove button */
+/* queue item remove button */
 .queue-item {
   position: relative;
-  padding-right: 3rem; /* Make space for remove button */
+  padding-right: 3rem; 
 }
 
 .queue-item-remove {
-  position: absolute;
-  right: 1rem;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  padding: 0.4rem;
-  border-radius: 50%;
-  color: var(--text-dark);
-  opacity: 0;
-  transition: all 0.2s ease;
-  cursor: pointer;
+  order: -1 !important; 
+  opacity: 0 !important;
+  padding: 4px !important;
+  border-radius: 4px !important;
+  background: none !important;
+  border: none !important;
+  color: var(--text-dark) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  margin-right: auto !important; 
 }
 
 .queue-item:hover .queue-item-remove {
@@ -1288,7 +1372,7 @@ input[type="range"] {
   transform: translateY(-50%) scale(0.95);
 }
 
-/* Add these styles to your existing CSS */
+
 
 .queue-section {
   margin-bottom: 1.5rem;
@@ -1307,7 +1391,7 @@ input[type="range"] {
   margin-bottom: 0.5rem;
 }
 
-/* Update existing queue styles to work with sections */
+
 .queue-list {
   padding: 0.5rem;
 }
@@ -1316,10 +1400,10 @@ input[type="range"] {
   margin: 0.5rem;
 }
 
-/* Update the jump to current track button styles */
+
 .jump-to-current-btn {
   position: fixed;
-  bottom: 70px;  /* Increased from 160px to 200px to move it much higher */
+  bottom: 70px;  
   left: 50%;
   transform: translateX(-50%);
   background: var(--accent);
@@ -1354,7 +1438,7 @@ input[type="range"] {
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(20px);  /* Increased initial offset */
+    transform: translateX(-50%) translateY(20px);  
   }
   to {
     opacity: 1;
@@ -1362,28 +1446,28 @@ input[type="range"] {
   }
 }
 
-/* Update tracklist to handle overflow properly */
+/* tracklist AND WE handle overflow properly */
 .tracklist {
   position: relative;
   overflow-y: auto;
-  height: calc(100% - 4rem);  /* Adjust based on your header height */
+  height: calc(100% - 4rem);  
   padding-bottom: 1rem;
 }
 
-/* Visualizer styles */
+
 .visualizer-container {
   position: absolute;
-  top: -60px;  /* Position above the controls */
+  top: -60px;  
   left: 0;
   right: 0;
   height: 50px;
   display: flex;
   justify-content: center;
   align-items: center;
-  pointer-events: none;  /* Allow clicking through */
+  pointer-events: none;  
 }
 
-/* Update visualizer button styles */
+/* visualizer button styles */
 .control-btn.visualizer-btn {
   padding: 0.6rem;
   background: var(--secondary-bg);
@@ -1410,6 +1494,139 @@ input[type="range"] {
 .control-btn.visualizer-btn svg {
   width: 16px;
   height: 16px;
+}
+
+/*  tooltip styles (probably irrelevant */
+[title] {
+  position: relative !important;
+  cursor: help !important;
+}
+
+
+[title]:hover::after {
+  content: attr(title) !important;
+  position: absolute !important;
+  bottom: 100% !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  padding: 4px 8px !important;
+  background: rgba(0, 0, 0, 0.8) !important;
+  color: white !important;
+  border-radius: 4px !important;
+  font-size: 0.8rem !important;
+  white-space: nowrap !important;
+  z-index: 1000 !important;
+  pointer-events: none !important;
+}
+
+.tracklist-controls {
+  display: flex !important;
+  gap: 0.5rem !important;
+  align-items: center !important;
+}
+
+.queue-item-remove {
+  opacity: 0 !important;
+  padding: 4px !important;
+  border-radius: 4px !important;
+  background: none !important;
+  border: none !important;
+  color: var(--text-dark) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.queue-item:hover .queue-item-remove {
+  opacity: 1 !important;
+}
+
+.queue-item-remove:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: var(--text-light) !important;
+}
+
+.queue-item-remove svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+/* styles for the download input container */
+.download-container .relative {
+  position: relative;
+  width: 100%;
+}
+
+.download-input {
+  width: 100% !important;
+  padding: 0.75rem 2.5rem 0.75rem 1rem !important; 
+}
+
+/*  clear button styles */
+.download-input + button {
+  position: absolute !important;
+  right: 12px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  color: var(--text-dark) !important;
+  background: transparent !important;
+  border: none !important;
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s ease !important;
+  padding: 0 !important;
+}
+
+.download-input + button:hover {
+  color: var(--text-light) !important;
+  background: var(--hover-bg) !important;
+  transform: translateY(-50%) scale(1.1) !important;
+}
+
+.download-input + button:active {
+  transform: translateY(-50%) scale(0.95) !important;
+}
+
+
+.download-input {
+  padding-right: 44px !important;
+}
+
+.control-btn.loop-btn {
+  padding: 0.6rem;
+  background: var(--secondary-bg);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.control-btn.loop-btn.active {
+  background: var(--accent);
+  border: none;
+  color: white;
+}
+
+.control-btn.loop-btn:hover {
+  background: var(--hover-bg);
+}
+
+.control-btn.loop-btn.active:hover {
+  background: var(--accent-hover);
+}
+
+
+.loop-indicator {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  background: var(--text-light);
+  border-radius: 50%;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
 }
 
 

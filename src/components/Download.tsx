@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Folder, Download as DownloadIcon, Loader2 } from 'lucide-react';
+import { Folder, Download as DownloadIcon, Loader2, X } from 'lucide-react';
 
 export default function Download({ 
   tracklistFolder, 
@@ -9,11 +9,11 @@ export default function Download({
   onDownloadComplete: () => void;
 }) {
   const [url, setUrl] = useState('');
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' | 'progress' } | null>(null);
   const [downloadDir, setDownloadDir] = useState<string>('');
   const [isDownloading, setIsDownloading] = useState(false);
 
-  // Initialize download directory
+  // initialize download directory
   useEffect(() => {
     const initDownloadDir = async () => {
       if (window.electron?.getDefaultDownloadDir) {
@@ -27,7 +27,7 @@ export default function Download({
   const handleDownload = async () => {
     try {
       setIsDownloading(true);
-      setMessage('Downloading...');
+      setMessage({ text: 'Downloading...', type: 'progress' });
       
       const response = await fetch('http://localhost:5000/download', {
         method: 'POST',
@@ -39,16 +39,22 @@ export default function Download({
 
       const data = await response.json();
       if (response.ok) {
-        setMessage('Download successful');
+        const songTitle = data.title?.trim() || 'Unknown Song';
+        setMessage({ 
+          text: songTitle !== 'Unknown Song' 
+            ? `Successfully downloaded "${songTitle}"`
+            : 'Successfully downloaded!',
+          type: 'success' 
+        });
         onDownloadComplete();
       } else {
-        setMessage(`Error: ${data.error}`);
+        setMessage({ text: `Error: ${data.error}`, type: 'error' });
       }
     } catch (error) {
       if (error instanceof Error) {
-        setMessage(`Error: ${error.message}`);
+        setMessage({ text: `Error: ${error.message}`, type: 'error' });
       } else {
-        setMessage('An unknown error occurred');
+        setMessage({ text: 'An unknown error occurred', type: 'error' });
       }
     } finally {
       setIsDownloading(false);
@@ -59,26 +65,50 @@ export default function Download({
     if (window.electron?.selectFolder) {
       const folders = await window.electron.selectFolder();
       if (folders.length > 0) {
-        setDownloadDir(folders[0]);
+        // get the folder path from the first file path
+        const folderPath = folders[0].split(/[\\/]/).slice(0, -1).join('/');
+        setDownloadDir(folderPath);
       }
     }
   };
 
-  const folderName = downloadDir ? downloadDir.split(/[\\/]/).pop() || '' : '';
+  const getFolderName = (path: string) => {
+    
+    const cleanPath = path.replace(/[\\/]+$/, '');
+    
+    return cleanPath.split(/[\\/]/).filter(Boolean).slice(-1)[0] || '';
+  };
+
+  const folderName = downloadDir ? getFolderName(downloadDir) : '';
+
+  const handleClear = () => {
+    setUrl('');
+    setMessage(null);
+  };
 
   return (
     <div className="download-container">
       <h2 className="download-title">Download Songs</h2>
       
       <div className="download-content">
-        <input
-          type="text"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="Enter song or playlist URL"
-          className="download-input"
-          disabled={isDownloading}
-        />
+        <div className="relative">
+          <input
+            type="text"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="Enter Spotify URL for song or playlist"
+            className="download-input"
+            disabled={isDownloading}
+          />
+          {url && (
+            <button
+              onClick={handleClear}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-gray-700 transition-colors"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
         
         <div className="download-options">
           <div className="folder-selection">
@@ -115,12 +145,8 @@ export default function Download({
         </div>
 
         {message && (
-          <div className={`download-message ${
-            message.includes('Error') ? 'error' : 
-            message.includes('progress') ? 'progress' :
-            'success'
-          }`}>
-            {message}
+          <div className={`download-message ${message.type}`}>
+            {message.text}
           </div>
         )}
       </div>

@@ -12,10 +12,32 @@ export interface ElectronAPI {
     getFilesInFolder: (folderPath: string) => Promise<string[]>;
     checkAlbumArtFolder: (folderPath: string) => Promise<string[]>;
     getDefaultDownloadDir: () => string;
+    getSavedFolder: () => Promise<string>;
+    saveFolder: (folder: string) => Promise<void>;
+    getSavedVolume: () => Promise<number>;
+    saveVolume: (volume: number) => Promise<void>;
+    getSaveStatePreference: () => Promise<boolean>;
 }
     
 declare global {
     interface Window {
       electron: ElectronAPI;
     }
+}
+
+export interface Track {
+  id: string;
+  title?: string;
+  artist?: string;
+  artists?: string[];
+  album?: string;
+  genre?: string;
+  year?: string;
+  duration?: number;
+  name?: string;
+  fullPath: string;
+  albumArt?: {
+    format: string;
+    data: string;
+  } | null;
 }

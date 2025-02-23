@@ -21,13 +21,14 @@ def get_song_info():
         return jsonify({'error': 'No URL provided'}), 400
 
     try:
-        # Using spotdl's track-info command
+        # use spotdl's track-info command
         info_process = subprocess.run(['spotdl', url, '--track-info'], 
                                    capture_output=True, text=True)
         output = info_process.stdout.strip()
         
+        # extract artist and title from output
         if output:
-            # "Artist - Title"
+            
             song_info = output.split('\n')[0] if '\n' in output else output
             return jsonify({'song': song_info}), 200
             
@@ -49,6 +50,23 @@ def download_song():
         os.makedirs(target_dir)
 
     try:
+        info_process = subprocess.run(['spotdl', url, '--track-info'], 
+                                   capture_output=True, text=True)
+        
+        output_lines = info_process.stdout.strip().split('\n')
+        song_info = None
+        
+        # "Artist - Title" format
+        for line in output_lines:
+            if ' - ' in line:
+                song_info = line.strip()
+                break
+        
+        # NOT "Artist - Title" format
+        if not song_info:
+            song_info = next((line for line in output_lines if line.strip()), 'Unknown Song')
+
+        # then download
         result = subprocess.run(['spotdl', url, '--output', target_dir], 
                               capture_output=True, text=True)
         
@@ -57,6 +75,7 @@ def download_song():
 
         return jsonify({
             'status': 'success',
+            'title': song_info,
             'directory': target_dir
         }), 200
 

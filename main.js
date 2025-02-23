@@ -1,10 +1,11 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
-import { fork, spawn } from "child_process";  // fork matches server.mjs
+import { fork, spawn } from "child_process";
 import fs from "fs";
-import * as mm from 'music-metadata';  // Add this import
-import os from "os";  // Add this import
+import * as mm from 'music-metadata';  
+import os from "os";  
+import Store from 'electron-store';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 let mainWindow;
@@ -12,10 +13,15 @@ let serverProcess;
 let flaskProcess;
 
 
+const store = new Store();
 
-// start express server alongside electron
+
+const defaultPreferences = { saveState: true };
+const preferences = new Store({ name: 'preferences', defaults: defaultPreferences });
+
+
 const startServer = () => {
-  if (serverProcess) return; // prevent multiple instances !!
+  if (serverProcess) return; 
 
   serverProcess = fork(path.join(__dirname, "server.mjs"), {
     stdio: "ignore",
@@ -24,25 +30,25 @@ const startServer = () => {
   serverProcess.unref();
 };
 
-// Start Flask server
+// start flask server
 const startFlaskServer = () => {
   flaskProcess = spawn(
     process.platform === 'win32' ? 'venv\\Scripts\\python' : 'venv/bin/python',
     ['-m', 'flask', 'run', '--port=5000'], 
     {
       cwd: path.join(__dirname, 'backend'),
-      stdio: 'pipe',  // Change from 'inherit' to 'pipe' to hide output
+      stdio: 'pipe',  
       env: {
         ...process.env,
         FLASK_APP: 'download.py',
         FLASK_ENV: 'development'
       },
       windowsHide: true,
-      detached: false  // Change to false to prevent detachment
+      detached: false 
     }
   );
 
-  // Optional: pipe output to console for debugging
+  
   flaskProcess.stdout?.on('data', (data) => console.log(`Flask: ${data}`));
   flaskProcess.stderr?.on('data', (data) => console.error(`Flask error: ${data}`));
 
@@ -51,9 +57,102 @@ const startFlaskServer = () => {
   });
 };
 
+
+function createMenu() {
+  const template = [
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'Open Folder in Tracklist',
+          click: async () => {
+            const result = await dialog.showOpenDialog(mainWindow, {
+              properties: ["openDirectory"],
+            });
+            if (!result.canceled) {
+              mainWindow.webContents.send('open-folder', result.filePaths[0]);
+            }
+          }
+        },
+        {
+          label: 'Go to Open Folder',
+          click: async () => {
+            const currentFolder = store.get('lastFolder');
+            if (currentFolder) {
+              shell.openPath(currentFolder);
+            }
+          },
+          enabled: !!store.get('lastFolder')
+        },
+        { type: 'separator' },
+        {
+          label: 'Save State on Exit',
+          type: 'checkbox',
+          checked: preferences.get('saveState'),
+          click: (menuItem) => {
+            preferences.set('saveState', menuItem.checked);
+          }
+        },
+        { type: 'separator' },
+        { role: 'quit' }
+      ]
+    },
+    { role: 'editMenu' },
+    {
+      role: 'viewMenu',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+        { type: 'separator' },
+        {
+          role: 'toggleDevTools',
+          click: () => mainWindow.webContents.openDevTools({ mode: 'detach' })  // open devtools in separate window so it doesnt mess with our specific layout lol
+        }
+      ]
+    },
+    { role: 'windowMenu' },
+    ...(process.platform === 'darwin' ? [{
+      label: app.name,
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' }
+      ]
+    }] : []),
+    {
+      label: 'Help',
+      role: 'help',
+      submenu: [
+        {
+          label: 'Learn More',
+          click: async () => {
+            await shell.openExternal('https://github.com/crowaltz24/serenade')
+          }
+        }
+      ]
+    }
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
+
 app.whenReady().then(() => {
   startServer();
-  startFlaskServer();  // Start the Flask server
+  startFlaskServer();  
+  createMenu();  
 
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -87,7 +186,7 @@ app.whenReady().then(() => {
     });
   });
 
-  // Move context menu creation here
+  
   const createContextMenu = (isEditable) => {
     const template = [];
     
@@ -109,23 +208,29 @@ app.whenReady().then(() => {
     return Menu.buildFromTemplate(template);
   };
 
-  // Add context menu handler
+  
   mainWindow.webContents.on('context-menu', (event, params) => {
     event.preventDefault();
     const menu = createContextMenu(params.isEditable);
     menu.popup({ window: mainWindow });
   });
 
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.control && input.key.toLowerCase() === 'i') {
+      event.preventDefault();
+      mainWindow.webContents.openDevTools({ mode: 'detach' });  
+    }
+  });
+
   mainWindow.on("closed", () => {
-    mainWindow = null;    // PREVENT MEMORY LEAKS
+    mainWindow = null;    
   });
 });
 
-// Add this function after the imports
 async function saveAlbumArt(filePath) {
   try {
     const metadata = await mm.parseFile(filePath);
-    if (!metadata.common.picture || metadata.common.picture.length === 0) {
+    if (!metadata.common.picture?.[0]?.data) {
       return null;
     }
 
@@ -134,7 +239,6 @@ async function saveAlbumArt(filePath) {
       ? picture.format.split('/')[1] 
       : picture.format;
     
-    // Create album-art directory in the same folder as the music file
     const dirPath = path.dirname(filePath);
     const albumArtDir = path.join(dirPath, 'album-art');
     
@@ -142,21 +246,59 @@ async function saveAlbumArt(filePath) {
       fs.mkdirSync(albumArtDir);
     }
 
-    // Create a filename based on the music file name
     const musicFileName = path.basename(filePath, path.extname(filePath));
     const imageFileName = `${musicFileName}.${format}`;
     const imagePath = path.join(albumArtDir, imageFileName);
 
-    // Save the image
-    fs.writeFileSync(imagePath, picture.data);
-    return imagePath;
+    // save the image if it doesn't exist
+    if (!fs.existsSync(imagePath)) {
+      fs.writeFileSync(imagePath, picture.data);
+    }
+
+    return {
+      path: imagePath,
+      format: `image/${format}`
+    };
   } catch (error) {
     console.error('Error saving album art:', error);
     return null;
   }
 }
 
-// Modify the existing select-folder handler
+
+// IPC HANDLERS
+
+
+
+ipcMain.handle("get-metadata", async (_, filePath) => {
+  try {
+    const metadata = await mm.parseFile(filePath, {
+      duration: false,
+      skipCovers: false,
+      includeChapters: false
+    });
+
+    const albumArt = await saveAlbumArt(filePath);
+    
+    
+    const artists = (metadata.common.artists || [metadata.common.artist])
+      .filter(artist => artist && artist !== 'Various Artists');
+
+    return {
+      title: metadata.common.title,
+      artist: metadata.common.artist,
+      artists: artists.length > 0 ? artists : undefined,
+      albumArt: albumArt ? {
+        format: albumArt.format,
+        data: fs.readFileSync(albumArt.path).toString('base64')
+      } : null
+    };
+  } catch (error) {
+    console.error('Error reading metadata for:', filePath, error);
+    return null;
+  }
+});
+
 ipcMain.handle("select-folder", async () => {
   if (!mainWindow) return [];
 
@@ -172,7 +314,7 @@ ipcMain.handle("select-folder", async () => {
       .filter((file) => file.endsWith(".mp3") || file.endsWith(".wav"))
       .map((file) => path.join(folderPath, file));
 
-    // Extract and save album art for each audio file
+    
     for (const audioFile of audioFiles) {
       await saveAlbumArt(audioFile);
     }
@@ -182,30 +324,12 @@ ipcMain.handle("select-folder", async () => {
   return [];
 });
 
-// Modify the get-metadata handler
-ipcMain.handle("get-metadata", async (_, filePath) => {
-  try {
-    const metadata = await mm.parseFile(filePath);
-    return {
-      title: metadata.common.title,
-      artist: metadata.common.artist,
-      albumArt: metadata.common.picture?.[0] ? {
-        format: metadata.common.picture[0].format,
-        data: metadata.common.picture[0].data.toString('base64')
-      } : null
-    };
-  } catch (error) {
-    console.error('Error reading metadata:', error);
-    return null;
-  }
-});
 
-// Add this IPC handler
 ipcMain.handle("get-file-url", async (_, filePath) => {
   return `http://localhost:3001/file?path=${encodeURIComponent(filePath)}`;
 });
 
-// Add this IPC handler with the other handlers
+
 ipcMain.handle("check-album-art-folder", async (_, folderPath) => {
   const albumArtDir = path.join(folderPath, 'album-art');
   
@@ -218,12 +342,12 @@ ipcMain.handle("check-album-art-folder", async (_, folderPath) => {
     .map(file => path.join(albumArtDir, file));
 });
 
-// Add this IPC handler to get the default download directory
+
 ipcMain.handle("get-default-download-dir", async () => {
   return path.join(os.homedir(), 'Downloads');
 });
 
-// Add this with your other IPC handlers
+
 ipcMain.handle("get-files-in-folder", async (_, folderPath) => {
   try {
     const files = fs.readdirSync(folderPath)
@@ -236,13 +360,40 @@ ipcMain.handle("get-files-in-folder", async (_, folderPath) => {
   }
 });
 
+
+ipcMain.handle("get-saved-folder", () => {
+  return store.get('lastFolder', '');
+});
+
+ipcMain.handle("save-folder", (_, folder) => {
+  store.set('lastFolder', folder);
+});
+
+ipcMain.handle("get-saved-volume", () => {
+  return store.get('volume', 1);
+});
+
+ipcMain.handle("save-volume", (_, volume) => {
+  store.set('volume', volume);
+});
+
+
+ipcMain.handle('get-save-state-preference', () => {
+  return preferences.get('saveState');
+});
+
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
 app.on('quit', () => {
+  if (!preferences.get('saveState')) {
+    
+    store.delete('lastFolder');
+    store.delete('volume');
+  }
+  
   if (flaskProcess) {
-    // Force kill the process and its children
     if (process.platform === 'win32') {
       spawn('taskkill', ['/pid', flaskProcess.pid, '/f', '/t']);
     } else {

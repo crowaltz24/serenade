@@ -1,19 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { Play, Pause, Folder, SkipForward, SkipBack, Volume2, VolumeX, X, Shuffle, ChevronUp, ChevronDown, List} from "lucide-react";
+import { Play, Pause, Folder, SkipForward, SkipBack, Volume2, VolumeX, X, Shuffle, ChevronUp, ChevronDown, List, Repeat } from "lucide-react";
 import Split from 'react-split';
 import Tracklist from './Tracklist';
 import Download from './Download';
-
-export type Track = {
-  fullPath: string;
-  name: string;
-  artist?: string;
-  title?: string;
-  albumArt?: {
-    format: string;
-    data: string;
-  } | null;
-};
+import QueueModal from './QueueModal';
+import type { Track } from '../electron';
 
 export default function MediaPlayer() {
   const [playlist, setPlaylist] = useState<Track[]>([]);
@@ -30,8 +21,7 @@ export default function MediaPlayer() {
   const [isMinimized, setIsMinimized] = useState(false);
   const [folderPath, setFolderPath] = useState<string>('');
   const [isShuffleOn, setIsShuffleOn] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [tempProgress, setTempProgress] = useState(0);
+  // const [isDragging, setIsDragging] = useState(false);
   const [splitSizes, setSplitSizes] = useState([50, 50]);
   const [playHistory, setPlayHistory] = useState<Track[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -41,6 +31,9 @@ export default function MediaPlayer() {
   const [showJumpToCurrentButton, setShowJumpToCurrentButton] = useState(false);
   const currentTrackRef = useRef<HTMLDivElement>(null);
   const tracklistRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLDivElement>(null);
+  const [isSeekMuted, setIsSeekMuted] = useState(false);
+  const [loopMode, setLoopMode] = useState<'none' | 'track' | 'playlist'>('none');
 
   const getFileName = (filePath: string) => {
     const fileNameWithExt = filePath.split(/[\\/]/).pop() || filePath;
@@ -53,26 +46,26 @@ export default function MediaPlayer() {
       if (files.length > 0) {
         const folderPath = files[0].split(/[\\/]/).slice(0, -1).join('/');
         setFolderPath(folderPath);
+        await window.electron.saveFolder(folderPath);
         
         const formattedFiles = await Promise.all(files.map(async (file: string) => {
           try {
             const metadata = await window.electron.getMetadata(file);
-            console.log('Metadata received for file:', file);
-            console.log('Album art:', metadata?.albumArt ? {
-              format: metadata.albumArt.format,
-              dataLength: metadata.albumArt.data.length
-            } : 'None');
+            const processedMetadata = processMetadata(metadata);
             
             return {
+              id: file,
               fullPath: file,
-              name: metadata?.title || getFileName(file),
-              artist: metadata?.artist || '',
-              title: metadata?.title || getFileName(file),
-              albumArt: metadata?.albumArt
+              name: processedMetadata.title || getFileName(file),
+              artist: processedMetadata.artist,
+              artists: processedMetadata.artists,
+              title: processedMetadata.title || getFileName(file),
+              albumArt: processedMetadata.albumArt
             };
           } catch (error) {
             console.error('Error processing file:', file, error);
             return {
+              id: file,
               fullPath: file,
               name: getFileName(file),
               artist: '',
@@ -81,11 +74,6 @@ export default function MediaPlayer() {
             };
           }
         }));
-        
-        console.log('First track album art:', formattedFiles[0].albumArt ? {
-          format: formattedFiles[0].albumArt.format,
-          dataLength: formattedFiles[0].albumArt.data.length
-        } : 'None');
         
         setPlaylist(formattedFiles);
         setCurrentTrack(formattedFiles[0]);
@@ -99,25 +87,38 @@ export default function MediaPlayer() {
     if (!currentTrack) return;
     const audio = audioRef.current;
 
-    if (isPlaying) {
-      audio.pause();
-    } else {
-      await audio.play();
+    try {
+      if (isPlaying) {
+        audio.pause();
+      } else {
+        
+        await new Promise(resolve => setTimeout(resolve, 0));
+        await audio.play();
+      }
+      setIsPlaying(!isPlaying);
+    } catch (error) {
+      console.error('Error toggling playback:', error);
     }
-
-    setIsPlaying(!isPlaying);
   };
 
   useEffect(() => {
     const audio = audioRef.current;
 
-    // Only update source if track changes
     if (currentTrack) {
       (async () => {
         const safeUrl = await window.electron.getFileUrl(currentTrack.fullPath);
         if (audio.src !== safeUrl) {
+          const wasPlaying = !audio.paused;
+          audio.pause();
           audio.src = safeUrl;
-          if (isPlaying) audio.play();
+          if (wasPlaying) {
+            try {
+              await new Promise(resolve => setTimeout(resolve, 0));
+              await audio.play();
+            } catch (error) {
+              console.error('Error playing audio:', error);
+            }
+          }
         }
       })();
     }
@@ -128,31 +129,27 @@ export default function MediaPlayer() {
       document.documentElement.style.setProperty('--progress-percent', progressPercent.toString());
     };
     const updateDuration = () => setDuration(audio.duration || 1);
-    const handleTrackEnd = () => playNext();  // use playNext instead of directly setting currentTrack
 
     audio.addEventListener("timeupdate", updateProgress);
     audio.addEventListener("loadedmetadata", updateDuration);
-    audio.addEventListener("ended", handleTrackEnd);
 
-    // volume bar fill
     document.documentElement.style.setProperty('--volume-percent', `${volume * 100}%`);
 
     return () => {
       audio.removeEventListener("timeupdate", updateProgress);
       audio.removeEventListener("loadedmetadata", updateDuration);
-      audio.removeEventListener("ended", handleTrackEnd);
     };
-  }, [currentTrack]); // dont depend on isplaying
+  }, [currentTrack]);
 
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
-      // Ignore if typing in an input element
+      
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
         return;
       }
       
       if (event.code === 'Space') {
-        event.preventDefault();
+        event.preventDefault(); 
         togglePlay();
       }
     };
@@ -163,41 +160,80 @@ export default function MediaPlayer() {
     };
   }, [currentTrack, isPlaying]);
 
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.setActionHandler('play', () => {
+        if (!isPlaying) togglePlay();
+      });
+      
+      navigator.mediaSession.setActionHandler('pause', () => {
+        if (isPlaying) togglePlay();
+      });
+      
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        playPrevious();
+      });
+      
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        playNext();
+      });
+
+      
+      if (currentTrack) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: currentTrack.title || currentTrack.name,
+          artist: currentTrack.artists?.join(', ') || currentTrack.artist || '',
+          
+          artwork: currentTrack.albumArt ? [
+            {
+              src: `data:${currentTrack.albumArt.format};base64,${currentTrack.albumArt.data}`,
+              sizes: '512x512',
+              type: currentTrack.albumArt.format
+            }
+          ] : undefined
+        });
+      }
+    }
+  }, [currentTrack, isPlaying]);
+
   const handleSeek = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = parseFloat(event.target.value);
-    setTempProgress(newTime);
-    if (!isDragging) {
-      audioRef.current.currentTime = newTime;
-      setProgress(newTime);
+    
+    
+    if (!isSeekMuted) {
+      setIsSeekMuted(true);
+      audioRef.current.muted = true;
     }
-  };
+    
+    audioRef.current.currentTime = newTime;
+    setProgress(newTime);
+    const progressPercent = (newTime / (duration || 1));
+    document.documentElement.style.setProperty('--progress-percent', progressPercent.toString());
 
-  const handleSeekStart = () => {
-    setIsDragging(true);
-  };
-
-  const handleSeekEnd = () => {
-    setIsDragging(false);
-    audioRef.current.currentTime = tempProgress;
-    setProgress(tempProgress);
+    
+    clearTimeout((window as any).seekTimeout);
+    (window as any).seekTimeout = setTimeout(() => {
+      setIsSeekMuted(false);
+      audioRef.current.muted = false;
+    }, 200);
   };
 
   const getNextTrack = () => {
-    // check user queue (priority)
+    
     if (userQueue.length > 0) {
       const nextTrack = userQueue[0];
       setUserQueue(prev => prev.slice(1));
       return nextTrack;
     }
     
-    // Then check shuffle queue
+    
     if (shuffleQueue.length > 0) {
       const nextTrack = shuffleQueue[0];
       setShuffleQueue(prev => prev.slice(1));
       return nextTrack;
     }
     
-    // If both queues are empty, get next track from playlist
+    
     if (!playlist.length) return null;
     const currentIndex = playlist.findIndex(track => track.fullPath === currentTrack?.fullPath);
     return playlist[(currentIndex + 1) % playlist.length];
@@ -209,28 +245,17 @@ export default function MediaPlayer() {
     return playlist[(currentIndex - 1 + playlist.length) % playlist.length];
   };
 
-  // const getRandomTrack = () => {
-  //   if (!playlist.length) return null;
-  //   const currentIndex = playlist.findIndex(track => track.fullPath === currentTrack?.fullPath);
-  //   let randomIndex;
-  //   do {
-  //     randomIndex = Math.floor(Math.random() * playlist.length);
-  //   } while (randomIndex === currentIndex && playlist.length > 1);
-  //   return playlist[randomIndex];
-  // };
-
   const updateCurrentTrackWithHistory = (track: Track | null) => {
     if (track) {
       setCurrentTrack(track);
       if (historyIndex === playHistory.length - 1) {
-        // keep only the last 10 tracks in history
+        // keeps only the last 10 tracks in history
         setPlayHistory(prev => {
           const newHistory = [...prev, track];
           return newHistory.slice(-10);
         });
         setHistoryIndex(prev => Math.min(prev + 1, 9));
       } else {
-        // If we're in the middle of history, truncate forward history
         setPlayHistory(prev => {
           const historySoFar = prev.slice(0, historyIndex + 1);
           const newHistory = [...historySoFar, track];
@@ -241,12 +266,13 @@ export default function MediaPlayer() {
     }
   };
 
-  const playNext = () => {
+  const playNext = async () => {
+    let nextTrack: Track | null;  
     if (isShuffleOn) {
-      const nextTrack = getNextTrack();
+      nextTrack = getNextTrack();
       updateCurrentTrackWithHistory(nextTrack);
       
-      // Ensure shuffle queue stays populated
+      
       if (shuffleQueue.length < 2 && userQueue.length === 0) {
         const remainingTracks = playlist
           .filter(track => 
@@ -257,34 +283,56 @@ export default function MediaPlayer() {
         setShuffleQueue(prev => [...prev, ...remainingTracks]);
       }
     } else {
-      updateCurrentTrackWithHistory(getNextTrack());
+      nextTrack = getNextTrack();
+      updateCurrentTrackWithHistory(nextTrack);
+    }
+
+    // continue playing the next track if already playing
+    if (isPlaying && nextTrack) {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 0));
+        await audioRef.current.play();
+      } catch (error) {
+        console.error('Error playing next track:', error);
+      }
     }
   };
 
-  const playPrevious = () => {
+  const playPrevious = async () => {
+    let prevTrack;
     if (isShuffleOn && playHistory.length > 0) {
       if (historyIndex > 0) {
-        // Go back in history
         setHistoryIndex(prev => prev - 1);
-        setCurrentTrack(playHistory[historyIndex - 1]);
+        prevTrack = playHistory[historyIndex - 1];
+        setCurrentTrack(prevTrack);
       } else {
-        // If at the start of history, stay on current track
-        setCurrentTrack(playHistory[0]);
+        prevTrack = playHistory[0];
+        setCurrentTrack(prevTrack);
       }
     } else {
-      // Normal previous behavior when shuffle is off
-      setCurrentTrack(getPrevTrack());
+      prevTrack = getPrevTrack();
+      setCurrentTrack(prevTrack);
+    }
+
+    
+    if (isPlaying && prevTrack) {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 0));
+        await audioRef.current.play();
+      } catch (error) {
+        console.error('Error playing previous track:', error);
+      }
     }
   };
 
-  const handleVolumeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleVolumeChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const newVolume = parseFloat(event.target.value);
     setVolume(newVolume);
     if (audioRef.current) {
       audioRef.current.volume = newVolume;
-      // Update volume bar fill
       document.documentElement.style.setProperty('--volume-percent', `${newVolume * 100}%`);
     }
+    await window.electron.saveVolume(newVolume);
   };
 
   const toggleModal = () => {
@@ -308,7 +356,7 @@ export default function MediaPlayer() {
     setIsShuffleOn(!isShuffleOn);
     
     if (!isShuffleOn && currentTrack) {
-      // When turning shuffle on, shuffle remaining playlist into shuffleQueue
+      // shuffle remaining tracks into shuffle queue
       const currentIndex = playlist.findIndex(track => track.fullPath === currentTrack.fullPath);
       const remainingTracks = playlist.slice(currentIndex + 1);
       const shuffledTracks = [...remainingTracks]
@@ -319,32 +367,43 @@ export default function MediaPlayer() {
       setPlayHistory([currentTrack]);
       setHistoryIndex(0);
     } else {
-      // When turning shuffle off, clear shuffle queue and restore sequential order
+      // clear shuffle queue and restore sequential order
       setShuffleQueue([]);
-      const currentIndex = playlist.findIndex(track => track.fullPath === currentTrack?.fullPath);
-      if (currentIndex !== -1) {
-        const remainingTracks = playlist.slice(currentIndex + 1);
-        // Keep user queue intact, only clear shuffle queue
-      }
     }
   };
 
   const refreshPlaylist = async () => {
     if (folderPath) {
       try {
-        // Get all music files from the current folder
+        // get all music files from the current folder
         const files = await window.electron.getFilesInFolder(folderPath);
         
-        // Process files and update playlist
+        
         const formattedFiles = await Promise.all(files.map(async (file: string) => {
-          const metadata = await window.electron.getMetadata(file);
-          return {
-            fullPath: file,
-            name: metadata?.title || getFileName(file),
-            artist: metadata?.artist || '',
-            title: metadata?.title || getFileName(file),
-            albumArt: metadata?.albumArt
-          };
+          try {
+            const metadata = await window.electron.getMetadata(file);
+            const processedMetadata = processMetadata(metadata);
+            
+            return {
+              id: file,
+              fullPath: file,
+              name: processedMetadata.title || getFileName(file),
+              artist: processedMetadata.artist,
+              artists: processedMetadata.artists,
+              title: processedMetadata.title || getFileName(file),
+              albumArt: processedMetadata.albumArt
+            };
+          } catch (error) {
+            console.error('Error processing file:', file, error);
+            return {
+              id: file,
+              fullPath: file,
+              name: getFileName(file),
+              artist: '',
+              title: getFileName(file),
+              albumArt: null
+            };
+          }
         }));
         setPlaylist(formattedFiles);
       } catch (error) {
@@ -365,9 +424,9 @@ export default function MediaPlayer() {
   useEffect(() => {
     const handleResize = () => {
       const totalWidth = window.innerWidth;
-      const minPaneWidth = 266; // Our minimum pane width
+      const minPaneWidth = 266; 
       
-      // If current split would make any pane too small, adjust the split
+      
       if (totalWidth * (splitSizes[0] / 100) < minPaneWidth || 
           totalWidth * (splitSizes[1] / 100) < minPaneWidth) {
         const newSize = (minPaneWidth / totalWidth) * 100;
@@ -379,21 +438,30 @@ export default function MediaPlayer() {
     return () => window.removeEventListener('resize', handleResize);
   }, [splitSizes]);
 
-  const handleTrackSelect = (track: Track) => {
-    if (isShuffleOn) {
-      updateCurrentTrackWithHistory(track);
-    } else {
-      setCurrentTrack(track);
+  const handleTrackSelect = async (track: Track) => {
+    try {
+      if (isShuffleOn) {
+        updateCurrentTrackWithHistory(track);
+      } else {
+        setCurrentTrack(track);
+      }
+      
+      if (isPlaying) {
+        await new Promise(resolve => setTimeout(resolve, 0));
+        await audioRef.current.play();
+      }
+      setIsPlaying(true);
+    } catch (error) {
+      console.error('Error selecting track:', error);
     }
-    setIsPlaying(true);
   };
 
   const removeFromQueue = (indexToRemove: number) => {
     if (indexToRemove < userQueue.length) {
-      // Remove from user queue
+      
       setUserQueue(prev => prev.filter((_, index) => index !== indexToRemove));
     } else {
-      // Remove from shuffle queue
+      
       const shuffleIndex = indexToRemove - userQueue.length;
       setShuffleQueue(prev => prev.filter((_, index) => index !== shuffleIndex));
     }
@@ -403,101 +471,17 @@ export default function MediaPlayer() {
     setUserQueue(prev => [...prev, track]);
   };
 
-  const QueueModal = ({ 
-    userQueue,
-    shuffleQueue, 
-    onClose, 
-    currentTrack 
-  }: { 
-    userQueue: Track[],
-    shuffleQueue: Track[], 
-    onClose: () => void,
-    currentTrack: Track | null 
-  }) => (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content queue-modal" onClick={e => e.stopPropagation()}>
-        <div className="queue-modal-header">
-          <h2>Play Queue</h2>
-          <button className="modal-close" onClick={onClose}>
-            <X size={24} />
-          </button>
-        </div>
-        <div className="queue-list">
-          {userQueue.length > 0 && (
-            <div className="queue-section">
-              <div className="queue-section-header">User Queue</div>
-              {userQueue.map((track, index) => (
-                <div 
-                  key={`user-${track.fullPath}-${index}`}
-                  className={`queue-item ${currentTrack?.fullPath === track.fullPath ? 'active' : ''}`}
-                >
-                  <div className="queue-item-info">
-                    <div className="queue-item-title">{track.title || track.name}</div>
-                    <div className="queue-item-artist">{track.artist || 'Unknown Artist'}</div>
-                  </div>
-                  <button 
-                    className="queue-item-remove"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeFromQueue(index);
-                    }}
-                    title="Remove from queue"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          
-          {shuffleQueue.length > 0 && isShuffleOn && (
-            <div className="queue-section">
-              <div className="queue-section-header">Shuffle Queue</div>
-              {shuffleQueue.map((track, index) => (
-                <div 
-                  key={`shuffle-${track.fullPath}-${index}`}
-                  className={`queue-item ${currentTrack?.fullPath === track.fullPath ? 'active' : ''}`}
-                >
-                  <div className="queue-item-info">
-                    <div className="queue-item-title">{track.title || track.name}</div>
-                    <div className="queue-item-artist">{track.artist || 'Unknown Artist'}</div>
-                  </div>
-                  <button 
-                    className="queue-item-remove"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeFromQueue(userQueue.length + index);
-                    }}
-                    title="Remove from queue"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          
-          {userQueue.length === 0 && (!isShuffleOn || shuffleQueue.length === 0) && (
-            <div className="queue-empty">Queue is empty</div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
   const handleTracklistScroll = () => {
     if (!currentTrackRef.current || !tracklistRef.current) return;
 
     const tracklistRect = tracklistRef.current.getBoundingClientRect();
     const currentTrackRect = currentTrackRef.current.getBoundingClientRect();
 
-    // Check if the current track is out of view
     const isOutOfView = 
       currentTrackRect.top < tracklistRect.top || 
       currentTrackRect.bottom > tracklistRect.bottom;
 
     setShowJumpToCurrentButton(isOutOfView);
-    console.log('Jump button visibility:', isOutOfView);
   };
 
   const scrollToCurrentTrack = () => {
@@ -509,6 +493,185 @@ export default function MediaPlayer() {
     });
   };
 
+  // const debugAlbumArt = (track: Track | null) => {
+  //   if (track?.albumArt) {
+  //     console.log('Album art debug:', {
+  //       format: track.albumArt.format,
+  //       dataLength: track.albumArt.data.length,
+  //       dataPreview: track.albumArt.data.substring(0, 50) + '...'
+  //     });
+  //   } else {
+  //     console.log('No album art available for track');
+  //   }
+  // };
+
+  useEffect(() => {
+    // verify if default album art exists
+    const img = new Image();
+    img.onerror = () => {
+      console.error('Default album art not found at:', DEFAULT_ALBUM_ART);
+    };
+    img.src = DEFAULT_ALBUM_ART;
+  }, []);
+
+  useEffect(() => {
+    if (textRef.current) {
+      const element = textRef.current;
+      
+      element.style.animation = 'none';
+      element.classList.remove('overflow');
+      
+      
+      void element.offsetWidth;
+      
+      
+      const textWidth = element.getBoundingClientRect().width;
+      if (textWidth > 300) {
+        element.classList.add('overflow');
+      }
+    }
+  }, [currentTrack]);
+
+  const processMetadata = (metadata: any) => {
+    return {
+      title: metadata?.title || '',
+      artist: metadata?.artist || '',
+      artists: metadata?.artists,
+      albumArt: metadata?.albumArt
+    };
+  };
+
+  useEffect(() => {
+    const loadSavedSettings = async () => {
+      
+      const savedFolder = await window.electron.getSavedFolder();
+      if (savedFolder) {
+        setFolderPath(savedFolder);
+        const files = await window.electron.getFilesInFolder(savedFolder);
+        
+        const formattedFiles = await Promise.all(files.map(async (file: string) => {
+          try {
+            const metadata = await window.electron.getMetadata(file);
+            const processedMetadata = processMetadata(metadata);
+            
+            return {
+              id: file,
+              fullPath: file,
+              name: processedMetadata.title || getFileName(file),
+              artist: processedMetadata.artist,
+              artists: processedMetadata.artists,
+              title: processedMetadata.title || getFileName(file),
+              albumArt: processedMetadata.albumArt
+            };
+          } catch (error) {
+            console.error('Error processing file:', file, error);
+            return {
+              id: file,
+              fullPath: file,
+              name: getFileName(file),
+              artist: '',
+              title: getFileName(file),
+              albumArt: null
+            };
+          }
+        }));
+        
+        setPlaylist(formattedFiles);
+        if (formattedFiles.length > 0) {
+          setCurrentTrack(formattedFiles[0]);
+        }
+      }
+
+      // loading saved volume
+      const savedVolume = await window.electron.getSavedVolume();
+      setVolume(savedVolume);
+      if (audioRef.current) {
+        audioRef.current.volume = savedVolume;
+      }
+      document.documentElement.style.setProperty('--volume-percent', `${savedVolume * 100}%`);
+    };
+
+    loadSavedSettings();
+  }, []);
+
+  useEffect(() => {
+    const handleFolderSelected = async (event: any) => {
+      const { folderPath, files } = event.detail;
+      setFolderPath(folderPath);
+      await window.electron.saveFolder(folderPath);
+      
+      const formattedFiles = await Promise.all(files.map(async (file: string) => {
+        try {
+          const metadata = await window.electron.getMetadata(file);
+          const processedMetadata = processMetadata(metadata);
+          
+          return {
+            id: file,
+            fullPath: file,
+            name: processedMetadata.title || getFileName(file),
+            artist: processedMetadata.artist,
+            artists: processedMetadata.artists,
+            title: processedMetadata.title || getFileName(file),
+            albumArt: processedMetadata.albumArt
+          };
+        } catch (error) {
+          console.error('Error processing file:', file, error);
+          return {
+            id: file,
+            fullPath: file,
+            name: getFileName(file),
+            artist: '',
+            title: getFileName(file),
+            albumArt: null
+          };
+        }
+      }));
+      
+      setPlaylist(formattedFiles);
+      if (formattedFiles.length > 0) {
+        setCurrentTrack(formattedFiles[0]);
+      }
+    };
+
+    window.addEventListener('folder-selected', handleFolderSelected);
+    return () => window.removeEventListener('folder-selected', handleFolderSelected);
+  }, []);
+
+  
+  const toggleLoop = () => {
+    setLoopMode(current => {
+      switch (current) {
+        case 'none': return 'track';
+        case 'track': return 'playlist';
+        case 'playlist': return 'none';
+      }
+    });
+  };
+
+  
+  useEffect(() => {
+    const audio = audioRef.current;
+    
+    const handleTrackEnd = () => {
+      if (loopMode === 'track') {
+        audio.currentTime = 0;
+        audio.play().catch(console.error);
+      } else if (loopMode === 'playlist') {
+        playNext();
+      } else {
+        const currentIndex = playlist.findIndex(track => track.fullPath === currentTrack?.fullPath);
+        if (currentIndex < playlist.length - 1) {
+          playNext();
+        }
+      }
+    };
+
+    audio.addEventListener("ended", handleTrackEnd);
+    return () => {
+      audio.removeEventListener("ended", handleTrackEnd);
+    };
+  }, [loopMode, currentTrack, playlist]);
+
   return (
     <div className="h-screen w-screen bg-gray-900 text-white relative">
       <h1 className="serenade-title">Serenade</h1>
@@ -518,13 +681,18 @@ export default function MediaPlayer() {
         sizes={splitSizes}
         minSize={400}
         gutterSize={8}
+        gutterStyle={() => ({
+          height: 'calc(100% - 14rem)',  
+          marginBottom: '14rem',         
+          marginTop: '60px'              
+        })}
         snapOffset={30}
         dragInterval={1}
         direction="horizontal"
         expandToMin={true}
         onDragEnd={(sizes) => setSplitSizes(sizes)}
       >
-        {/* Left side - Tracklist */}
+        {/* left side - Tracklist */}
         <div className="h-full">
           {playlist.length > 0 ? (
             <Tracklist 
@@ -551,7 +719,7 @@ export default function MediaPlayer() {
           )}
         </div>
 
-        {/* Right side - Download */}
+        {/* right side - Download */}
         <div className="h-full">
           <Download 
             tracklistFolder={folderPath} 
@@ -560,7 +728,7 @@ export default function MediaPlayer() {
         </div>
       </Split>
 
-      {/* Player Controls */}
+      {/* player Controls */}
       <div className={`media-controls-container ${isMinimized ? 'minimized' : ''}`}>
         <div className="media-controls-container">
           {isMinimized ? (
@@ -579,27 +747,22 @@ export default function MediaPlayer() {
               <button 
                 className="maximize-btn"
                 onClick={() => setIsMinimized(false)}
-                title="Maximize player"
               >
                 <ChevronUp size={16} />
               </button>
             </>
           ) : (
             <>
-              {/* Track Info Section */}
+              {/* track Info section */}
               <div className="track-info">
                 <div className="track-image" onClick={toggleModal}>
-                  {currentTrack ? (
+                  {currentTrack?.albumArt ? (
                     <img 
-                      src={currentTrack.albumArt 
-                        ? `data:${currentTrack.albumArt.format};base64,${currentTrack.albumArt.data}`
-                        : DEFAULT_ALBUM_ART
-                      }
+                      src={`data:${currentTrack.albumArt.format};base64,${currentTrack.albumArt.data.replace(/[^A-Za-z0-9+/=]/g, '')}`}
                       alt="Album Art"
                       className="album-img"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
-                        console.log('Image load error, falling back to default');
                         target.src = DEFAULT_ALBUM_ART;
                         target.onerror = null;
                       }}
@@ -614,26 +777,38 @@ export default function MediaPlayer() {
                 </div>
                 <div className="track-details">
                   <div className="track-name">
-                    {currentTrack?.title || currentTrack?.name || 'No track selected'}
+                    <div 
+                      ref={textRef}
+                      className="track-name-inner"
+                      data-content={currentTrack?.title || currentTrack?.name || 'No track selected'}
+                      title={currentTrack?.title || currentTrack?.name || 'No track selected'}
+                    >
+                      {currentTrack?.title || currentTrack?.name || 'No track selected'}
+                    </div>
                   </div>
-                  <div className="track-artist">
-                    {currentTrack?.artist || ''}
+                  <div 
+                    className="track-artist"
+                    title={currentTrack?.artists?.join(', ') || currentTrack?.artist || ''}
+                  >
+                    {currentTrack?.artists ? (
+                      currentTrack.artists.length > 2 
+                        ? `${currentTrack.artists[0]}, ${currentTrack.artists[1]} & ${currentTrack.artists.length - 2} more`
+                        : currentTrack.artists.join(', ')
+                    ) : (
+                      currentTrack?.artist || ''
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Progress Bar */}
-              <div className="w-full mb-2">
+              {/* progress bar */}
+              <div className="w-full mb-2" style={{ width: '50%', margin: '0 auto' }}>
                 <input
                   type="range"
                   min="0"
                   max={duration}
-                  value={isDragging ? tempProgress : progress}
+                  value={progress}
                   onChange={handleSeek}
-                  onMouseDown={handleSeekStart}
-                  onMouseUp={handleSeekEnd}
-                  onTouchStart={handleSeekStart}
-                  onTouchEnd={handleSeekEnd}
                   className="progress-bar"
                 />
                 <div className="flex justify-between">
@@ -665,16 +840,21 @@ export default function MediaPlayer() {
                 
                 <div className="volume-controls">
                   <button 
-                    onClick={() => setIsShuffleOn(!isShuffleOn)}
+                    onClick={toggleShuffle}
                     className={`control-btn shuffle-btn ${isShuffleOn ? 'active' : ''}`}
-                    title="Shuffle"
                   >
                     <Shuffle size={16} />
                   </button>
                   <button 
+                    onClick={toggleLoop}
+                    className={`control-btn loop-btn ${loopMode !== 'none' ? 'active' : ''}`}
+                  >
+                    <Repeat size={16} />
+                    {loopMode === 'track' && <span className="loop-indicator" />}
+                  </button>
+                  <button 
                     onClick={() => setIsQueueModalOpen(true)} 
                     className="control-btn queue-btn"
-                    title="View Queue"
                   >
                     <List size={16} />
                   </button>
@@ -693,7 +873,6 @@ export default function MediaPlayer() {
                   <button 
                     className="minimize-btn"
                     onClick={() => setIsMinimized(true)}
-                    title="Minimize player"
                   >
                     <ChevronDown size={16} />
                   </button>
@@ -704,38 +883,46 @@ export default function MediaPlayer() {
         </div>
       </div>
 
-      {/* Add Modal */}
-      {isModalOpen && currentTrack && (
+      {/* add modal */}
+      {isModalOpen && (
         <div className="modal-overlay" onClick={toggleModal}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <button className="modal-close" onClick={toggleModal}>
               <X size={24} />
             </button>
-            <img 
-              src={currentTrack.albumArt 
-                ? `data:${currentTrack.albumArt.format};base64,${currentTrack.albumArt.data}`
-                : DEFAULT_ALBUM_ART
-              }
-              alt="Album Art"
-              className="modal-image"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                console.log('Modal image load error, falling back to default');
-                target.src = DEFAULT_ALBUM_ART;
-                target.onerror = null;
-              }}
-            />
+            {currentTrack?.albumArt ? (
+              <img 
+                src={`data:${currentTrack.albumArt.format};base64,${currentTrack.albumArt.data.replace(/[^A-Za-z0-9+/=]/g, '')}`}
+                alt="Album Art"
+                className="modal-image"
+                onError={(e) => {
+                  console.error('Failed to load modal album art, falling back to default');
+                  const target = e.target as HTMLImageElement;
+                  target.src = DEFAULT_ALBUM_ART;
+                  target.onerror = null;
+                }}
+              />
+            ) : (
+              <img 
+                src={DEFAULT_ALBUM_ART}
+                alt="Default Album Art"
+                className="modal-image"
+              />
+            )}
           </div>
         </div>
       )}
 
-      {/* Add Queue Modal */}
+      {/* add queue modal */}
       {isQueueModalOpen && (
         <QueueModal 
           userQueue={userQueue}
           shuffleQueue={shuffleQueue}
           onClose={() => setIsQueueModalOpen(false)}
           currentTrack={currentTrack}
+          isShuffleOn={isShuffleOn}
+          onRemoveFromQueue={removeFromQueue}
+          onAddToQueue={addToQueue}
         />
       )}
     </div>

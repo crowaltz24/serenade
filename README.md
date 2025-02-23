@@ -1,26 +1,41 @@
 # Serenade
 
-A lightweight, open-source music player built with Electron and React, featuring local playback, and music downloading capabilities, and with planned audio visualization features.
+A lightweight, open-source music player built with Electron and React, featuring local playback, and music downloading capabilities, with planned audio visualization features. Created for FOSS Hack 2025.
 
 ## Features
 - Local audio file playback with modern UI
-- Folder-based music organization
+- Folder and Tracklist level music organization
+- Music downloading via SpotDL integration (automatic metadata tagging, playlist download, etc!)
 - Real-time audio visualization
 - Secure Electron architecture
-- Music downloading via SpotDL integration (automatic metadata tagging, playlist download, etc!)
 
 ## Installation
 
+NOTE: Serenade is UNTESTED on Unix/Linux/macOS.
+
 ```bash
 # Clone the repository
-git clone https://github.com/crowaltz24/serenade.git
+git clone https://github.com/yourusername/serenade.git
 cd serenade
 
-# Install dependencies
+# Install Node dependencies
 npm install
 
-# Install SpotDL (Required for music downloads)
-pip install spotdl
+# Set up Python environment
+cd backend
+python -m venv venv
+
+# Activate virtual environment (Windows)
+.\venv\Scripts\activate
+
+# For Unix/Linux/macOS use:
+# source venv/bin/activate
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Return to root directory
+cd ..
 ```
 
 ## Usage
@@ -48,11 +63,8 @@ npm run package
 - Express 4.21.2
 - Vite 6.1.0
 
-## Upcoming Features
-- Advanced playback controls
-- Improved download manager
-- Tracklist-level music organization
-- Audio visualization feature
+## Planned Features
+- Additional Visualizer styles
 - Custom theme support
 
 ## License

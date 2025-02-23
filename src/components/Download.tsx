@@ -65,7 +65,7 @@ export default function Download({
     if (window.electron?.selectFolder) {
       const folders = await window.electron.selectFolder();
       if (folders.length > 0) {
-        // get the folder path from the first file path
+        // folder path
         const folderPath = folders[0].split(/[\\/]/).slice(0, -1).join('/');
         setDownloadDir(folderPath);
       }
@@ -73,9 +73,8 @@ export default function Download({
   };
 
   const getFolderName = (path: string) => {
-    
+    // cleaning up op
     const cleanPath = path.replace(/[\\/]+$/, '');
-    
     return cleanPath.split(/[\\/]/).filter(Boolean).slice(-1)[0] || '';
   };
 

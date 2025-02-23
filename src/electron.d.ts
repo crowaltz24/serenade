@@ -17,6 +17,8 @@ export interface ElectronAPI {
     getSavedVolume: () => Promise<number>;
     saveVolume: (volume: number) => Promise<void>;
     getSaveStatePreference: () => Promise<boolean>;
+    getTrackOrder: (folderPath: string) => Promise<string[]>;
+    saveTrackOrder: (folderPath: string, order: string[]) => Promise<void>;
 }
     
 declare global {

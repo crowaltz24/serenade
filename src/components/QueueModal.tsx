@@ -73,15 +73,15 @@ export default function QueueModal({
     <div 
       className="modal-overlay" 
       onClick={() => {
-        setContextMenu(null);  
-        onClose();            
+        setContextMenu(null);  // close context menu first
+        onClose();            // then close modal
       }}
     >
       <div 
         className="modal-content queue-modal" 
         onClick={e => {
           e.stopPropagation();
-          setContextMenu(null);  
+          setContextMenu(null);
         }}
         style={{ maxHeight: '80vh' }}
       >

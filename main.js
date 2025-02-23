@@ -3,8 +3,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { fork, spawn } from "child_process";
 import fs from "fs";
-import * as mm from 'music-metadata';  
-import os from "os";  
+import * as mm from 'music-metadata';
+import os from "os";
 import Store from 'electron-store';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -12,16 +12,15 @@ let mainWindow;
 let serverProcess;
 let flaskProcess;
 
-
+// store
 const store = new Store();
-
-
 const defaultPreferences = { saveState: true };
 const preferences = new Store({ name: 'preferences', defaults: defaultPreferences });
+const trackOrderStore = new Store({ name: 'trackOrder' });
 
-
+// start express server alongside electron
 const startServer = () => {
-  if (serverProcess) return; 
+  if (serverProcess) return; // prevent multiple instances !!
 
   serverProcess = fork(path.join(__dirname, "server.mjs"), {
     stdio: "ignore",
@@ -30,25 +29,25 @@ const startServer = () => {
   serverProcess.unref();
 };
 
-// start flask server
+// start Flask server
 const startFlaskServer = () => {
   flaskProcess = spawn(
     process.platform === 'win32' ? 'venv\\Scripts\\python' : 'venv/bin/python',
     ['-m', 'flask', 'run', '--port=5000'], 
     {
       cwd: path.join(__dirname, 'backend'),
-      stdio: 'pipe',  
+      stdio: 'pipe',  // hide output
       env: {
         ...process.env,
         FLASK_APP: 'download.py',
         FLASK_ENV: 'development'
       },
       windowsHide: true,
-      detached: false 
+      detached: false
     }
   );
 
-  
+  // debugging
   flaskProcess.stdout?.on('data', (data) => console.log(`Flask: ${data}`));
   flaskProcess.stderr?.on('data', (data) => console.error(`Flask error: ${data}`));
 
@@ -56,7 +55,6 @@ const startFlaskServer = () => {
     console.log(`Flask server exited with code ${code}`);
   });
 };
-
 
 function createMenu() {
   const template = [
@@ -151,8 +149,8 @@ function createMenu() {
 
 app.whenReady().then(() => {
   startServer();
-  startFlaskServer();  
-  createMenu();  
+  startFlaskServer();
+  createMenu();
 
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -186,7 +184,6 @@ app.whenReady().then(() => {
     });
   });
 
-  
   const createContextMenu = (isEditable) => {
     const template = [];
     
@@ -208,7 +205,9 @@ app.whenReady().then(() => {
     return Menu.buildFromTemplate(template);
   };
 
-  
+
+
+
   mainWindow.webContents.on('context-menu', (event, params) => {
     event.preventDefault();
     const menu = createContextMenu(params.isEditable);
@@ -218,15 +217,18 @@ app.whenReady().then(() => {
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.control && input.key.toLowerCase() === 'i') {
       event.preventDefault();
-      mainWindow.webContents.openDevTools({ mode: 'detach' });  
+      mainWindow.webContents.openDevTools({ mode: 'detach' });  // open devtools in separate window so it doesnt mess with our specific layout lol
     }
   });
 
   mainWindow.on("closed", () => {
-    mainWindow = null;    
+    mainWindow = null;    // PREVENT MEMORY LEAKS
   });
 });
 
+
+
+// full image path and format
 async function saveAlbumArt(filePath) {
   try {
     const metadata = await mm.parseFile(filePath);
@@ -250,7 +252,7 @@ async function saveAlbumArt(filePath) {
     const imageFileName = `${musicFileName}.${format}`;
     const imagePath = path.join(albumArtDir, imageFileName);
 
-    // save the image if it doesn't exist
+    // Save image if it doesn't exist
     if (!fs.existsSync(imagePath)) {
       fs.writeFileSync(imagePath, picture.data);
     }
@@ -266,10 +268,14 @@ async function saveAlbumArt(filePath) {
 }
 
 
-// IPC HANDLERS
+
+// IPC handlers
 
 
 
+
+
+// use saved album art
 ipcMain.handle("get-metadata", async (_, filePath) => {
   try {
     const metadata = await mm.parseFile(filePath, {
@@ -280,7 +286,7 @@ ipcMain.handle("get-metadata", async (_, filePath) => {
 
     const albumArt = await saveAlbumArt(filePath);
     
-    
+    // filter out 'Various Artists' bs
     const artists = (metadata.common.artists || [metadata.common.artist])
       .filter(artist => artist && artist !== 'Various Artists');
 
@@ -314,7 +320,7 @@ ipcMain.handle("select-folder", async () => {
       .filter((file) => file.endsWith(".mp3") || file.endsWith(".wav"))
       .map((file) => path.join(folderPath, file));
 
-    
+    // extract and save album art for each audio file
     for (const audioFile of audioFiles) {
       await saveAlbumArt(audioFile);
     }
@@ -324,11 +330,9 @@ ipcMain.handle("select-folder", async () => {
   return [];
 });
 
-
 ipcMain.handle("get-file-url", async (_, filePath) => {
   return `http://localhost:3001/file?path=${encodeURIComponent(filePath)}`;
 });
-
 
 ipcMain.handle("check-album-art-folder", async (_, folderPath) => {
   const albumArtDir = path.join(folderPath, 'album-art');
@@ -342,11 +346,10 @@ ipcMain.handle("check-album-art-folder", async (_, folderPath) => {
     .map(file => path.join(albumArtDir, file));
 });
 
-
+// get default download directory
 ipcMain.handle("get-default-download-dir", async () => {
   return path.join(os.homedir(), 'Downloads');
 });
-
 
 ipcMain.handle("get-files-in-folder", async (_, folderPath) => {
   try {
@@ -359,7 +362,6 @@ ipcMain.handle("get-files-in-folder", async (_, folderPath) => {
     return [];
   }
 });
-
 
 ipcMain.handle("get-saved-folder", () => {
   return store.get('lastFolder', '');
@@ -377,9 +379,16 @@ ipcMain.handle("save-volume", (_, volume) => {
   store.set('volume', volume);
 });
 
-
 ipcMain.handle('get-save-state-preference', () => {
   return preferences.get('saveState');
+});
+
+ipcMain.handle("save-track-order", (_, folderPath, order) => {
+  trackOrderStore.set(folderPath, order);
+});
+
+ipcMain.handle("get-track-order", (_, folderPath) => {
+  return trackOrderStore.get(folderPath, []);
 });
 
 app.on("window-all-closed", () => {
@@ -388,7 +397,6 @@ app.on("window-all-closed", () => {
 
 app.on('quit', () => {
   if (!preferences.get('saveState')) {
-    
     store.delete('lastFolder');
     store.delete('volume');
   }

@@ -12,6 +12,8 @@ CORS(app, resources={
     }
 })
 
+spotdl_path = os.path.join(os.path.dirname(__file__), "venv", "Scripts", "spotdl.exe")
+
 @app.route('/get-song-info', methods=['POST'])
 def get_song_info():
     data = request.json
@@ -21,14 +23,13 @@ def get_song_info():
         return jsonify({'error': 'No URL provided'}), 400
 
     try:
-        # use spotdl's track-info command
-        info_process = subprocess.run(['spotdl', url, '--track-info'], 
+        # using spotdl's track-info command
+        info_process = subprocess.run([spotdl_path, url, '--track-info'], 
                                    capture_output=True, text=True)
         output = info_process.stdout.strip()
         
-        # extract artist and title from output
         if output:
-            
+            # "Artist - Title" format
             song_info = output.split('\n')[0] if '\n' in output else output
             return jsonify({'song': song_info}), 200
             
@@ -46,28 +47,52 @@ def download_song():
     if not url:
         return jsonify({'error': 'No URL provided'}), 400
 
+    # Check if spotdl is available
+    try:
+        print("Checking spotdl version...")  # debugging
+        version_result = subprocess.run([spotdl_path, '--version'], 
+                                      capture_output=True, 
+                                      text=True)
+        print(f"Version output: {version_result.stdout}")
+    except Exception as e:
+        import sys
+        error_msg = f"""
+        Error checking spotdl
+        Python executable: {sys.executable}
+        PATH: {os.environ.get('PATH')}
+        Working directory: {os.getcwd()}
+        Error type: {type(e).__name__}
+        Error: {str(e)}
+        """
+        print(error_msg)
+        return jsonify({
+            'error': f'Error with spotdl: {str(e)}'
+        }), 500
+
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
 
     try:
-        info_process = subprocess.run(['spotdl', url, '--track-info'], 
+        # Get song info
+        info_process = subprocess.run([spotdl_path, url, '--track-info'], 
                                    capture_output=True, text=True)
         
+        # Parse the info
         output_lines = info_process.stdout.strip().split('\n')
         song_info = None
         
-        # "Artist - Title" format
+        # find hyphenm
         for line in output_lines:
             if ' - ' in line:
                 song_info = line.strip()
                 break
         
-        # NOT "Artist - Title" format
+        # else use the first non-empty line
         if not song_info:
             song_info = next((line for line in output_lines if line.strip()), 'Unknown Song')
 
-        # then download
-        result = subprocess.run(['spotdl', url, '--output', target_dir], 
+        # Then download
+        result = subprocess.run([spotdl_path, url, '--output', target_dir], 
                               capture_output=True, text=True)
         
         if result.returncode != 0:

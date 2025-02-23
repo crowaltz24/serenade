@@ -5,6 +5,7 @@ import Tracklist from './Tracklist';
 import Download from './Download';
 import QueueModal from './QueueModal';
 import type { Track } from '../electron';
+import AudioVisualizer from './AudioVisualizer';
 
 export default function MediaPlayer() {
   const [playlist, setPlaylist] = useState<Track[]>([]);
@@ -29,11 +30,13 @@ export default function MediaPlayer() {
   const [shuffleQueue, setShuffleQueue] = useState<Track[]>([]);
   const [isQueueModalOpen, setIsQueueModalOpen] = useState(false);
   const [showJumpToCurrentButton, setShowJumpToCurrentButton] = useState(false);
-  const currentTrackRef = useRef<HTMLDivElement>(null);
-  const tracklistRef = useRef<HTMLDivElement>(null);
+  const currentTrackRef = useRef<HTMLDivElement>(null) as React.RefObject<HTMLDivElement>;
+  const tracklistRef = useRef<HTMLDivElement>(null) as React.RefObject<HTMLDivElement>;
   const textRef = useRef<HTMLDivElement>(null);
   const [isSeekMuted, setIsSeekMuted] = useState(false);
   const [loopMode, setLoopMode] = useState<'none' | 'track' | 'playlist'>('none');
+  const [isContentMinimized, setIsContentMinimized] = useState(false);
+  // const [isAudioReady, setIsAudioReady] = useState(false);
 
   const getFileName = (filePath: string) => {
     const fileNameWithExt = filePath.split(/[\\/]/).pop() || filePath;
@@ -91,7 +94,7 @@ export default function MediaPlayer() {
       if (isPlaying) {
         audio.pause();
       } else {
-        
+        // pending pause?
         await new Promise(resolve => setTimeout(resolve, 0));
         await audio.play();
       }
@@ -103,6 +106,9 @@ export default function MediaPlayer() {
 
   useEffect(() => {
     const audio = audioRef.current;
+    audio.id = 'main-audio-element';  // ID for easy find
+    audio.crossOrigin = 'anonymous';
+    document.body.appendChild(audio);
 
     if (currentTrack) {
       (async () => {
@@ -138,18 +144,19 @@ export default function MediaPlayer() {
     return () => {
       audio.removeEventListener("timeupdate", updateProgress);
       audio.removeEventListener("loadedmetadata", updateDuration);
+      document.body.removeChild(audio);
     };
   }, [currentTrack]);
 
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
-      
+      // ignore if typing in an input element
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
         return;
       }
       
       if (event.code === 'Space') {
-        event.preventDefault(); 
+        event.preventDefault();
         togglePlay();
       }
     };
@@ -178,12 +185,11 @@ export default function MediaPlayer() {
         playNext();
       });
 
-      
+      // update metadata when track changes
       if (currentTrack) {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: currentTrack.title || currentTrack.name,
           artist: currentTrack.artists?.join(', ') || currentTrack.artist || '',
-          
           artwork: currentTrack.albumArt ? [
             {
               src: `data:${currentTrack.albumArt.format};base64,${currentTrack.albumArt.data}`,
@@ -199,7 +205,7 @@ export default function MediaPlayer() {
   const handleSeek = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = parseFloat(event.target.value);
     
-    
+    // TEMP MUTE AUDIO DURING SEEK
     if (!isSeekMuted) {
       setIsSeekMuted(true);
       audioRef.current.muted = true;
@@ -210,7 +216,7 @@ export default function MediaPlayer() {
     const progressPercent = (newTime / (duration || 1));
     document.documentElement.style.setProperty('--progress-percent', progressPercent.toString());
 
-    
+    // DELAY FOR UNMUTE
     clearTimeout((window as any).seekTimeout);
     (window as any).seekTimeout = setTimeout(() => {
       setIsSeekMuted(false);
@@ -219,29 +225,45 @@ export default function MediaPlayer() {
   };
 
   const getNextTrack = () => {
-    
+    // check user queue (FIRST priority)
     if (userQueue.length > 0) {
       const nextTrack = userQueue[0];
       setUserQueue(prev => prev.slice(1));
       return nextTrack;
     }
     
-    
+    // THEN shuffle queue
     if (shuffleQueue.length > 0) {
       const nextTrack = shuffleQueue[0];
       setShuffleQueue(prev => prev.slice(1));
       return nextTrack;
     }
     
-    
+    // If both empty, get next track from playlist
     if (!playlist.length) return null;
     const currentIndex = playlist.findIndex(track => track.fullPath === currentTrack?.fullPath);
     return playlist[(currentIndex + 1) % playlist.length];
   };
 
-  const getPrevTrack = () => {
-    if (!playlist.length) return null;
-    const currentIndex = playlist.findIndex(track => track.fullPath === currentTrack?.fullPath);
+  const getPrevTrack = async () => {
+    if (!playlist.length || !currentTrack) return null;
+  
+    // custom order??
+    try {
+      const savedOrder = await window.electron.getTrackOrder(folderPath);
+      if (savedOrder && savedOrder.length > 0) {
+        const currentIndex = savedOrder.indexOf(currentTrack.fullPath);
+        if (currentIndex > -1) {
+          const prevPath = savedOrder[(currentIndex - 1 + savedOrder.length) % savedOrder.length];
+          return playlist.find(track => track.fullPath === prevPath) || null;
+        }
+      }
+    } catch (error) {
+      console.error('Error getting track order:', error);
+    }
+    
+    // else fall back to directory order
+    const currentIndex = playlist.findIndex(track => track.fullPath === currentTrack.fullPath);
     return playlist[(currentIndex - 1 + playlist.length) % playlist.length];
   };
 
@@ -267,11 +289,10 @@ export default function MediaPlayer() {
   };
 
   const playNext = async () => {
-    let nextTrack: Track | null;  
+    let nextTrack: Track | null;
     if (isShuffleOn) {
       nextTrack = getNextTrack();
       updateCurrentTrackWithHistory(nextTrack);
-      
       
       if (shuffleQueue.length < 2 && userQueue.length === 0) {
         const remainingTracks = playlist
@@ -287,7 +308,7 @@ export default function MediaPlayer() {
       updateCurrentTrackWithHistory(nextTrack);
     }
 
-    // continue playing the next track if already playing
+    // If we were playing, continue playing the next track
     if (isPlaying && nextTrack) {
       try {
         await new Promise(resolve => setTimeout(resolve, 0));
@@ -310,11 +331,13 @@ export default function MediaPlayer() {
         setCurrentTrack(prevTrack);
       }
     } else {
-      prevTrack = getPrevTrack();
-      setCurrentTrack(prevTrack);
+      prevTrack = await getPrevTrack();
+      if (prevTrack) {
+        setCurrentTrack(prevTrack);
+      }
     }
 
-    
+    // If we were playing, continue playing the previous track
     if (isPlaying && prevTrack) {
       try {
         await new Promise(resolve => setTimeout(resolve, 0));
@@ -344,10 +367,12 @@ export default function MediaPlayer() {
     if (isMuted) {
       audio.volume = previousVolume;
       setVolume(previousVolume);
+      document.documentElement.style.setProperty('--volume-percent', `${previousVolume * 100}%`);
     } else {
       setPreviousVolume(volume);
       audio.volume = 0;
       setVolume(0);
+      document.documentElement.style.setProperty('--volume-percent', '0%');
     }
     setIsMuted(!isMuted);
   };
@@ -375,10 +400,10 @@ export default function MediaPlayer() {
   const refreshPlaylist = async () => {
     if (folderPath) {
       try {
-        // get all music files from the current folder
+        // Get ALL music files from the current folder
         const files = await window.electron.getFilesInFolder(folderPath);
         
-        
+        // process files and update playlist
         const formattedFiles = await Promise.all(files.map(async (file: string) => {
           try {
             const metadata = await window.electron.getMetadata(file);
@@ -424,9 +449,9 @@ export default function MediaPlayer() {
   useEffect(() => {
     const handleResize = () => {
       const totalWidth = window.innerWidth;
-      const minPaneWidth = 266; 
+      const minPaneWidth = 266; // Our minimum pane width
       
-      
+      // if current split makes any pane too small, adjust the split
       if (totalWidth * (splitSizes[0] / 100) < minPaneWidth || 
           totalWidth * (splitSizes[1] / 100) < minPaneWidth) {
         const newSize = (minPaneWidth / totalWidth) * 100;
@@ -445,9 +470,8 @@ export default function MediaPlayer() {
       } else {
         setCurrentTrack(track);
       }
-      
       if (isPlaying) {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise(resolve => setTimeout(resolve, 0)); // play immediately if already plying
         await audioRef.current.play();
       }
       setIsPlaying(true);
@@ -458,10 +482,10 @@ export default function MediaPlayer() {
 
   const removeFromQueue = (indexToRemove: number) => {
     if (indexToRemove < userQueue.length) {
-      
+      // remove from user queue
       setUserQueue(prev => prev.filter((_, index) => index !== indexToRemove));
     } else {
-      
+      // remove from shuffle queue
       const shuffleIndex = indexToRemove - userQueue.length;
       setShuffleQueue(prev => prev.filter((_, index) => index !== shuffleIndex));
     }
@@ -506,7 +530,6 @@ export default function MediaPlayer() {
   // };
 
   useEffect(() => {
-    // verify if default album art exists
     const img = new Image();
     img.onerror = () => {
       console.error('Default album art not found at:', DEFAULT_ALBUM_ART);
@@ -515,21 +538,32 @@ export default function MediaPlayer() {
   }, []);
 
   useEffect(() => {
-    if (textRef.current) {
-      const element = textRef.current;
-      
-      element.style.animation = 'none';
-      element.classList.remove('overflow');
-      
-      
-      void element.offsetWidth;
-      
-      
-      const textWidth = element.getBoundingClientRect().width;
-      if (textWidth > 300) {
-        element.classList.add('overflow');
+    const checkOverflow = () => {
+      if (textRef.current) {
+        const element = textRef.current;
+        
+        element.classList.remove('overflow');
+        void element.offsetWidth;
+        
+        // if text is overflowing
+        const isOverflowing = element.scrollWidth > (element.parentElement?.clientWidth || 0);
+        if (isOverflowing) {
+          element.classList.add('overflow');
+        }
       }
-    }
+    };
+
+    // check on track change
+    checkOverflow();
+
+    // CHECK AFTER DELAY IF PROPERLY RENDERED
+    const timeoutId = setTimeout(checkOverflow, 100);
+    window.addEventListener('resize', checkOverflow);
+
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', checkOverflow);
+    };
   }, [currentTrack]);
 
   const processMetadata = (metadata: any) => {
@@ -543,11 +577,13 @@ export default function MediaPlayer() {
 
   useEffect(() => {
     const loadSavedSettings = async () => {
-      
       const savedFolder = await window.electron.getSavedFolder();
       if (savedFolder) {
         setFolderPath(savedFolder);
         const files = await window.electron.getFilesInFolder(savedFolder);
+        
+        // get saved track order first
+        const savedOrder = await window.electron.getTrackOrder(savedFolder);
         
         const formattedFiles = await Promise.all(files.map(async (file: string) => {
           try {
@@ -577,12 +613,21 @@ export default function MediaPlayer() {
         }));
         
         setPlaylist(formattedFiles);
+        
         if (formattedFiles.length > 0) {
-          setCurrentTrack(formattedFiles[0]);
+          // If exists a saved order, use first track from it
+          if (savedOrder && savedOrder.length > 0) {
+            const firstOrderedTrack = formattedFiles.find(track => 
+              track.fullPath === savedOrder[0]
+            );
+            setCurrentTrack(firstOrderedTrack || formattedFiles[0]);
+          } else {
+            setCurrentTrack(formattedFiles[0]);
+          }
         }
       }
 
-      // loading saved volume
+      // saved volume
       const savedVolume = await window.electron.getSavedVolume();
       setVolume(savedVolume);
       if (audioRef.current) {
@@ -637,7 +682,8 @@ export default function MediaPlayer() {
     return () => window.removeEventListener('folder-selected', handleFolderSelected);
   }, []);
 
-  
+
+
   const toggleLoop = () => {
     setLoopMode(current => {
       switch (current) {
@@ -648,7 +694,6 @@ export default function MediaPlayer() {
     });
   };
 
-  
   useEffect(() => {
     const audio = audioRef.current;
     
@@ -672,63 +717,91 @@ export default function MediaPlayer() {
     };
   }, [loopMode, currentTrack, playlist]);
 
+  const toggleMinimize = () => {
+    setIsMinimized(!isMinimized);
+    setIsContentMinimized(!isContentMinimized);
+  };
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    
+    const handleCanPlay = () => {
+      // setIsAudioReady(true);
+    };
+
+    audio.addEventListener('canplay', handleCanPlay);
+    
+    return () => {
+      audio.removeEventListener('canplay', handleCanPlay);
+    };
+  }, []);
+
   return (
     <div className="h-screen w-screen bg-gray-900 text-white relative">
       <h1 className="serenade-title">Serenade</h1>
 
-      <Split 
-        className="app-container split"
-        sizes={splitSizes}
-        minSize={400}
-        gutterSize={8}
-        gutterStyle={() => ({
-          height: 'calc(100% - 14rem)',  
-          marginBottom: '14rem',         
-          marginTop: '60px'              
-        })}
-        snapOffset={30}
-        dragInterval={1}
-        direction="horizontal"
-        expandToMin={true}
-        onDragEnd={(sizes) => setSplitSizes(sizes)}
-      >
-        {/* left side - Tracklist */}
-        <div className="h-full">
-          {playlist.length > 0 ? (
-            <Tracklist 
-              playlist={playlist}
-              currentTrack={currentTrack}
-              onTrackSelect={handleTrackSelect}
-              onFolderSelect={selectFolder}
-              folderPath={folderPath}
-              onRefresh={refreshPlaylist}
-              onAddToQueue={addToQueue}
-              tracklistRef={tracklistRef}
-              currentTrackRef={currentTrackRef}
-              onScroll={handleTracklistScroll}
-              showJumpToCurrentButton={showJumpToCurrentButton}
-              onJumpToCurrentClick={scrollToCurrentTrack}
+      <div className={`visualizer-placeholder ${isContentMinimized ? 'visible' : ''}`}>
+        <AudioVisualizer 
+          isPlaying={isPlaying}
+          currentTrack={currentTrack}
+        />
+      </div>
+
+      <div className={`content-wrapper ${isContentMinimized ? 'minimized' : ''}`}>
+        <Split 
+          className="app-container split"
+          sizes={splitSizes}
+          minSize={400}
+          gutterSize={8}
+          gutterStyle={() => ({
+            height: 'calc(100% - 14rem)',
+            marginBottom: '14rem',
+            marginTop: '60px'
+          })}
+          snapOffset={30}
+          dragInterval={1}
+          direction="horizontal"
+          expandToMin={true}
+          onDragEnd={(sizes) => setSplitSizes(sizes)}
+        >
+          {/* left side - Tracklist */}
+          <div className="h-full">
+            {playlist.length > 0 ? (
+              <Tracklist 
+                playlist={playlist}
+                currentTrack={currentTrack}
+                onTrackSelect={handleTrackSelect}
+                onFolderSelect={selectFolder}
+                folderPath={folderPath}
+                onRefresh={refreshPlaylist}
+                onAddToQueue={addToQueue}
+                tracklistRef={tracklistRef}
+                currentTrackRef={currentTrackRef}
+                onScroll={handleTracklistScroll}
+                showJumpToCurrentButton={showJumpToCurrentButton}
+                onJumpToCurrentClick={scrollToCurrentTrack}
+              />
+            ) : (
+              <div className="empty-tracklist">
+                <button onClick={selectFolder} className="folder-btn">
+                  <Folder size={20} />
+                  Select Music Folder
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* right side - Download */}
+          <div className="h-full">
+            <Download 
+              tracklistFolder={folderPath} 
+              onDownloadComplete={refreshPlaylist}
             />
-          ) : (
-            <div className="empty-tracklist">
-              <button onClick={selectFolder} className="folder-btn">
-                <Folder size={20} />
-                Select Music Folder
-              </button>
-            </div>
-          )}
-        </div>
+          </div>
+        </Split>
+      </div>
 
-        {/* right side - Download */}
-        <div className="h-full">
-          <Download 
-            tracklistFolder={folderPath} 
-            onDownloadComplete={refreshPlaylist}
-          />
-        </div>
-      </Split>
-
-      {/* player Controls */}
+      {/* player controls */}
       <div className={`media-controls-container ${isMinimized ? 'minimized' : ''}`}>
         <div className="media-controls-container">
           {isMinimized ? (
@@ -746,14 +819,14 @@ export default function MediaPlayer() {
               </div>
               <button 
                 className="maximize-btn"
-                onClick={() => setIsMinimized(false)}
+                onClick={toggleMinimize}
               >
                 <ChevronUp size={16} />
               </button>
             </>
           ) : (
             <>
-              {/* track Info section */}
+              {/* track info section */}
               <div className="track-info">
                 <div className="track-image" onClick={toggleModal}>
                   {currentTrack?.albumArt ? (
@@ -780,8 +853,6 @@ export default function MediaPlayer() {
                     <div 
                       ref={textRef}
                       className="track-name-inner"
-                      data-content={currentTrack?.title || currentTrack?.name || 'No track selected'}
-                      title={currentTrack?.title || currentTrack?.name || 'No track selected'}
                     >
                       {currentTrack?.title || currentTrack?.name || 'No track selected'}
                     </div>
@@ -801,7 +872,7 @@ export default function MediaPlayer() {
                 </div>
               </div>
 
-              {/* progress bar */}
+              {/* Progress Bar */}
               <div className="w-full mb-2" style={{ width: '50%', margin: '0 auto' }}>
                 <input
                   type="range"
@@ -872,9 +943,9 @@ export default function MediaPlayer() {
                   />
                   <button 
                     className="minimize-btn"
-                    onClick={() => setIsMinimized(true)}
+                    onClick={toggleMinimize}
                   >
-                    <ChevronDown size={16} />
+                    {isMinimized ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </button>
                 </div>
               </div>
@@ -883,7 +954,7 @@ export default function MediaPlayer() {
         </div>
       </div>
 
-      {/* add modal */}
+      {/* Album art modal */}
       {isModalOpen && (
         <div className="modal-overlay" onClick={toggleModal}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -913,7 +984,7 @@ export default function MediaPlayer() {
         </div>
       )}
 
-      {/* add queue modal */}
+      {/* Queue modal */}
       {isQueueModalOpen && (
         <QueueModal 
           userQueue={userQueue}

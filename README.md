@@ -11,6 +11,14 @@ Demo: https://youtu.be/vaxG7x0cvm8
 - Real-time audio visualization
 - Secure Electron architecture
 
+## Screenshots
+
+![image](https://github.com/user-attachments/assets/80c13acb-b817-4741-8f43-e30b435780cd)
+
+![image](https://github.com/user-attachments/assets/60f668df-b86f-4e2d-95ba-1e5236180459)
+
+![image](https://github.com/user-attachments/assets/93fb8e2f-59e4-4a5d-8bb0-889c7a21c237)
+
 ## Installation
 
 NOTE: Serenade is UNTESTED on Unix/Linux/macOS.

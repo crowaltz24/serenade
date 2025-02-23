@@ -27,7 +27,7 @@ NOTE: Serenade is UNTESTED on Unix/Linux/macOS.
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/serenade.git
+git clone https://github.com/crowaltz24/serenade.git
 cd serenade
 
 # Install Node dependencies

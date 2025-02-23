@@ -44,10 +44,10 @@ cd ..
 # Development mode
 npm run dev
 
-# Build application
+# Build application (DOESN'T QUITE WORK JUST YET)
 npm run build
 
-# Package for distribution
+# Package for distribution (DOESN'T QUITE WORK JUST YET)
 npm run package
 ```
 
